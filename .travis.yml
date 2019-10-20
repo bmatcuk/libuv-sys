@@ -1,0 +1,23 @@
+language: rust
+rust:
+  - stable
+os:
+  - linux
+  - osx
+  - windows
+
+addons:
+  apt:
+    packages:
+      - llvm-dev
+      - libclang-dev
+      - clang
+  homebrew:
+    packages:
+      - llvm
+
+before_install:
+  - rustup component add rustfmt
+
+script:
+  - cargo build --release -v

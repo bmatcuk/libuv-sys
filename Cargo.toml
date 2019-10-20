@@ -1,0 +1,15 @@
+[package]
+name = "libuv-sys"
+version = "1.33.0"
+description = "Thin FFI bindings for libuv"
+categories = ["command-line-interface", "external-ffi-bindings"]
+keywords = ["events", "libevent", "loop"]
+license = "MIT OR Apache-2.0"
+authors = ["Bob Matcuk <bmatcuk@gmail.com>"]
+edition = "2018"
+readme = "README.md"
+
+[build-dependencies]
+bindgen = "0.51"
+pkg-config = "0.3"
+which = "3.0"
