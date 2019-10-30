@@ -216,6 +216,7 @@ fn build_with_cmake<S: AsRef<OsStr>>(cmake: &S, force: bool) -> Result<bool> {
             up2.to_string_lossy().as_ref(),
             "-DBUILD_TESTING=OFF",
             "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
         ],
     )?;
 

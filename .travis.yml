@@ -35,7 +35,6 @@ before_deploy:
 deploy:
   provider: releases
   file: "{linux,osx,windows}-*"
-  draft: true
   overwrite: true
   edge: true
   on:
