@@ -1,14 +1,10 @@
 language: rust
 rust:
   - stable
-jobs:
-  include:
-    - os: linux
-      env: LIB_FILENAME=libuv_a.a
-    - os: osx
-      env: LIB_FILENAME=libuv_a.a
-    - os: windows
-      env: LIB_FILENAME=uv_a.lib
+os:
+  - linux
+  - osx
+  - windows
 
 addons:
   apt:
@@ -27,15 +23,3 @@ script:
   - cargo build -v
   - find target/debug/build -path "*/libuv-sys-*/output" -exec cat '{}' \;
   - cargo test
-
-before_deploy:
-  - find target/debug/build -path "*/libuv-sys-*/bindings.rs" -exec cp '{}' "${TRAVIS_OS_NAME}-bindings.rs" \;
-  - find target/debug/build -path "*/libuv-sys-*/${LIB_FILENAME}" -exec cp '{}' "${TRAVIS_OS_NAME}-${LIB_FILENAME}" \;
-
-deploy:
-  provider: releases
-  file: "{linux,osx,windows}-*"
-  overwrite: true
-  edge: true
-  on:
-    tags: true

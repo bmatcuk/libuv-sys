@@ -1,32 +1,20 @@
 use std::env;
 use std::error;
-use std::ffi::OsStr;
 use std::fmt;
-use std::fs::{create_dir_all, OpenOptions};
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
-use which::which;
 
 static LIBUV_VERSION: &str = "v1.30";
-static LIBUV_REPOSITORY: &str = "https://github.com/libuv/libuv.git";
-static LIBUV_SOURCE_PATH: &str = "libuv.source";
-
-static GYP_REPOSITORY: &str = "https://chromium.googlesource.com/external/gyp";
 
 #[derive(Debug)]
 enum Error {
     BindgenError,
-    CommandError(String, io::Error),
-    CommandFailure(String, Output),
     PathError(String, io::Error),
-    VersionNotFound,
 }
 
 impl error::Error for Error {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match self {
-            Error::CommandError(_, err) => Some(err),
             Error::PathError(_, err) => Some(err),
             _ => None,
         }
@@ -37,21 +25,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::BindgenError => write!(f, "Failed to generate ffi bindings"),
-            Error::CommandError(cmd, source) => write!(f, "Failed to run `{}`: {}", cmd, source),
-            Error::CommandFailure(cmd, out) => {
-                let stdout = std::str::from_utf8(&out.stdout).unwrap();
-                let stderr = std::str::from_utf8(&out.stderr).unwrap();
-                write!(f, "`{}` did not exit successfully: {}", cmd, out.status)?;
-                if !stdout.is_empty() {
-                    write!(f, "\n--- stdout\n{}", stdout)?;
-                }
-                if !stderr.is_empty() {
-                    write!(f, "\n--- stderr\n{}", stderr)?;
-                }
-                Ok(())
-            }
             Error::PathError(dir, source) => write!(f, "Path error for `{}`: {}", dir, source),
-            Error::VersionNotFound => write!(f, "Could not find libuv {}", LIBUV_VERSION),
         }
     }
 }
@@ -64,331 +38,242 @@ fn build_pkgconfig_max_version() -> String {
     format!("{}.{}", &LIBUV_VERSION[1..dotidx], next_minor_version)
 }
 
-fn envify(name: &str) -> String {
-    name.chars()
-        .map(|c| match c.to_ascii_uppercase() {
-            '-' => '_',
-            c => c,
-        })
-        .collect()
-}
+fn try_pkgconfig() -> Option<Option<PathBuf>> {
+    // can't use pkg-config for cross-compile
+    if env::var("TARGET") != env::var("HOST") {
+        return None;
+    }
 
-fn find_executable(name: &str) -> Option<PathBuf> {
-    env::var_os(format!("{}_PATH", envify(name)))
-        .map(|p| p.into())
-        .or_else(|| which(name).ok())
-}
-
-fn run(mut cmd: Command) -> Result<Vec<u8>> {
-    println!("Running {:?}...", cmd);
-
-    match cmd.output() {
-        Ok(output) => {
-            if output.status.success() {
-                Ok(output.stdout)
-            } else {
-                Err(Error::CommandFailure(format!("{:?}", cmd), output))
+    // If we find libuv with pkg-config, we just need bindings... if there are _any_ errors, just
+    // move on to building. Either we don't have pkg-config, or we don't have libuv.
+    let max_version = build_pkgconfig_max_version();
+    let pkgconfig_result = pkg_config::Config::new()
+        .range_version(&LIBUV_VERSION[1..]..max_version.as_ref())
+        .env_metadata(true)
+        .probe("libuv");
+    if let Ok(libuv) = pkgconfig_result {
+        println!("Resolving libuv with pkg-config");
+        for include_path in libuv.include_paths {
+            let header_path = include_path.join("uv.h");
+            if header_path.exists() {
+                return Some(Some(include_path));
             }
         }
-        Err(cause) => Err(Error::CommandError(format!("{:?}", cmd), cause)),
+
+        // we couldn't find uv.h, but we have a local copy anyway so it's not necessarily an
+        // error...
+        return Some(None);
     }
+    return None
 }
 
-fn build_command<S: AsRef<OsStr>, P: AsRef<Path>>(pwd: &P, cmd: &S, args: &[&str]) -> Command {
-    let mut cmd = Command::new(cmd);
-    cmd.args(args).current_dir(pwd);
-    cmd
-}
+fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
+    let src_path = source_path.as_ref().join("src");
+    let unix_path = src_path.join("unix");
 
-fn quick_run<S: AsRef<OsStr>, P: AsRef<Path>>(pwd: &P, cmd: &S, args: &[&str]) -> Result<Vec<u8>> {
-    run(build_command(pwd, cmd, args))
-}
+    let target = env::var("TARGET").unwrap();
+    let android = target.ends_with("-android") || target.ends_with("-androideabi");
+    let apple = target.contains("-apple-");
+    let dragonfly = target.ends_with("-dragonfly");
+    let freebsd = target.ends_with("-freebsd");
+    let linux = target.contains("-linux-");
+    let netbsd = target.ends_with("-netbsd");
+    let openbsd = target.ends_with("-openbsd");
+    let solaris = target.ends_with("-solaris");
 
-fn mkdirp<P: AsRef<Path>>(path: &P) -> Result<()> {
-    create_dir_all(path).map_err(|e| Error::PathError(path.as_ref().to_string_lossy().into(), e))
-}
+    // based on libuv's CMakeLists.txt
+    let mut build = cc::Build::new();
+    let compiler = build.get_compiler();
+    let clang = compiler.is_like_clang();
+    let gnu = compiler.is_like_gnu();
+    let msvc = compiler.is_like_msvc();
+    build
+        .include(source_path.as_ref().join("include"))
+        .include(&src_path);
 
-fn touch<P: AsRef<Path>>(path: &P) -> Result<()> {
-    match OpenOptions::new()
-        .create(true)
-        .write(true)
-        .open(path.as_ref())
-    {
-        Ok(_) => Ok(()),
-        Err(e) => Err(Error::PathError(path.as_ref().to_string_lossy().into(), e)),
-    }
-}
-
-fn force_redownload() -> bool {
-    env::var_os("LIBUV_REDOWNLOAD").is_some()
-}
-
-fn download_libuv<S: AsRef<OsStr>>(git: &S) -> Result<(PathBuf, bool)> {
-    println!("Downloading libuv...");
-
-    let outdir: PathBuf = env::var("OUT_DIR").unwrap().into();
-    let source_path = outdir.join(LIBUV_SOURCE_PATH);
-    let gitdir = source_path.join(".git");
-    if Path::new(&gitdir).exists() {
-        if force_redownload() {
-            // fetch latest and reset hard
-            quick_run(&source_path, &git, &["fetch", "origin"])?;
-            quick_run(&source_path, &git, &["reset", "--hard", "FETCH_HEAD"])?;
-        } else {
-            println!("- source already downloaded; skipping...");
-            return Ok((source_path, false));
-        }
-    } else {
-        // download
-        quick_run(
-            &outdir,
-            &git,
-            &["clone", LIBUV_REPOSITORY, LIBUV_SOURCE_PATH],
-        )?;
+    if msvc {
+        build.flag("/W4");
+    } else if apple || clang || gnu {
+        build
+            .flag("-fvisibility=hidden")
+            .flag("--std=gnu89")
+            .flag("-Wall")
+            .flag("-Wextra")
+            .flag("-Wstrict-prototypes")
+            .flag("-Wno-unused-parameter");
     }
 
-    // find the tag for the version
-    let tags = quick_run(
-        &source_path,
-        &git,
-        &[
-            "tag",
-            "-l",
-            &format!("{}.*", LIBUV_VERSION),
-            "--sort",
-            "-version:refname",
-        ],
-    )?;
-    let tag = match std::str::from_utf8(&tags).unwrap().lines().nth(0) {
-        Some(tag) => tag.trim(),
-        None => return Err(Error::VersionNotFound),
-    };
+    build
+        .file(src_path.join("fs-poll.c"))
+        .file(src_path.join("idna.c"))
+        .file(src_path.join("inet.c"))
+        .file(src_path.join("strscpy.c"))
+        .file(src_path.join("threadpool.c"))
+        .file(src_path.join("timer.c"))
+        .file(src_path.join("uv-common.c"))
+        .file(src_path.join("uv-data-getter-setters.c"))
+        .file(src_path.join("version.c"));
 
-    // checkout the version tag
-    println!("- checking out {}...", tag);
-    quick_run(&source_path, &git, &["checkout", tag])?;
-
-    Ok((source_path, true))
-}
-
-fn force_rebuild() -> bool {
-    env::var_os("LIBUV_REBUILD").is_some()
-}
-
-fn build_with_cmake<S: AsRef<OsStr>>(cmake: &S, force: bool) -> Result<bool> {
-    println!("Building libuv with cmake...");
-
-    // make build directory
-    let force = force || force_rebuild();
-    let outdir: PathBuf = env::var("OUT_DIR").unwrap().into();
-    let build_path = outdir.join(LIBUV_SOURCE_PATH).join("out").join("cmake");
-    let library_path = if cfg!(windows) {
-        build_path.join("Release")
-    } else {
-        build_path.clone()
-    };
-    println!(
-        "cargo:rustc-link-search=native={}",
-        library_path.to_string_lossy()
-    );
-    println!("cargo:rustc-link-lib=static=uv_a");
-
-    let library_output = if cfg!(windows) {
-        library_path.join("uv_a.lib")
-    } else {
-        library_path.join("libuv_a.a")
-    };
-    if library_output.exists() && !force {
-        println!("- build exists; skipping...");
-        return Ok(false);
-    }
-
-    println!("- making output directory {:?}...", build_path);
-    mkdirp(&build_path)?;
-
-    // configure cmake
-    let up2 = Path::new("..").join("..");
-    println!("- configure...");
-    quick_run(
-        &build_path,
-        &cmake,
-        &[
-            up2.to_string_lossy().as_ref(),
-            "-DBUILD_TESTING=OFF",
-            "-DCMAKE_BUILD_TYPE=Release",
-            "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
-        ],
-    )?;
-
-    // build
-    println!("- build...");
-    quick_run(
-        &build_path,
-        &cmake,
-        &["--build", ".", "--config", "Release"],
-    )?;
-
-    Ok(true)
-}
-
-fn build_with_gyp<S: AsRef<OsStr>>(git: &S, force: bool) -> Result<bool> {
-    println!("Building libuv with gyp...");
-
-    let outdir: PathBuf = env::var("OUT_DIR").unwrap().into();
-    let source_path = outdir.join(LIBUV_SOURCE_PATH);
-    let force = force || force_rebuild();
-
-    // build, unfortunately, depends on the os =(
     if cfg!(windows) {
-        let lib_path = source_path.join("Release").join("lib");
-        println!(
-            "cargo:rustc-link-search=native={}",
-            lib_path.to_string_lossy()
-        );
-        println!("cargo:rustc-link-lib=static=uv");
-        // TODO: what's the name of the static library?
-        if lib_path.join("libuv.lib").exists() && !force {
-            println!("- build exists; skipping...");
-            return Ok(false);
-        }
+        println!("cargo:rustc-link-lib=advapi32");
+        println!("cargo:rustc-link-lib=iphlpapi");
+        println!("cargo:rustc-link-lib=psapi");
+        println!("cargo:rustc-link-lib=shell32");
+        println!("cargo:rustc-link-lib=user32");
+        println!("cargo:rustc-link-lib=userenv");
+        println!("cargo:rustc-link-lib=ws2_32");
 
-        println!("- running vcbuild...");
-        quick_run(&source_path, &source_path.join("vcbuild.bat"), &[])?;
-
-        return Ok(true);
-    }
-
-    // install gyp
-    let gyp_path = source_path.join("build").join("gyp");
-    if !gyp_path.exists() {
-        println!("- install gyp...");
-        quick_run(
-            &outdir,
-            &git,
-            &["clone", GYP_REPOSITORY, gyp_path.to_string_lossy().as_ref()],
-        )?;
-    }
-
-    // build... TODO: android?
-    if cfg!(target_os = "macos") {
-        let lib_path = source_path.join("build").join("Release");
-        println!(
-            "cargo:rustc-link-search=native={}",
-            lib_path.to_string_lossy()
-        );
-        println!("cargo:rustc-link-lib=static=uv");
-        if lib_path.join("libuv.a").exists() && !force {
-            println!("- build exists; skipping...");
-            return Ok(false);
-        }
-
-        let xcodebuild = find_executable("xcodebuild").expect("`xcodebuild` is required");
-        let target = env::var("TARGET").unwrap();
-        let arch_idx = target.find('-').unwrap();
-        println!("- building xcodeproj...");
-        quick_run(
-            &source_path,
-            &source_path.join("gyp_uv.py"),
-            &["-f", "xcode"],
-        )?;
-
-        println!("- build...");
-        quick_run(
-            &source_path,
-            &xcodebuild,
-            &[
-                &format!("-ARCHS={}", &target[..arch_idx]),
-                "-project",
-                "out/uv.xcodeproj",
-                "-configuration",
-                "Release",
-                "-alltargets",
-            ],
-        )?;
+        let win_path = src_path.join("win");
+        build
+            .define("WIN32_LEAN_AND_MEAN", None)
+            .define("_WIN32_WINNT", "0x0600")
+            .file(win_path.join("async.c"))
+            .file(win_path.join("core.c"))
+            .file(win_path.join("detect-wakeup.c"))
+            .file(win_path.join("dl.c"))
+            .file(win_path.join("error.c"))
+            .file(win_path.join("fs.c"))
+            .file(win_path.join("fs-event.c"))
+            .file(win_path.join("getaddrinfo.c"))
+            .file(win_path.join("getnameinfo.c"))
+            .file(win_path.join("handle.c"))
+            .file(win_path.join("loop-watcher.c"))
+            .file(win_path.join("pipe.c"))
+            .file(win_path.join("thread.c"))
+            .file(win_path.join("poll.c"))
+            .file(win_path.join("process.c"))
+            .file(win_path.join("process-stdio.c"))
+            .file(win_path.join("signal.c"))
+            .file(win_path.join("snprintf.c"))
+            .file(win_path.join("stream.c"))
+            .file(win_path.join("tcp.c"))
+            .file(win_path.join("tty.c"))
+            .file(win_path.join("udp.c"))
+            .file(win_path.join("util.c"))
+            .file(win_path.join("winapi.c"))
+            .file(win_path.join("winsock.c"));
     } else {
-        let lib_path = source_path.join("out").join("Release");
-        println!(
-            "cargo:rustc-link-search=native={}",
-            lib_path.to_string_lossy()
-        );
-        println!("cargo:rustc-link-lib=static=uv");
-        if lib_path.join("libuv.a").exists() && !force {
-            println!("- build exists; skipping...");
-            return Ok(false);
+        if !android {
+            println!("cargo:rustc-link-lib=pthread");
         }
 
-        println!("- building Makefile...");
-        quick_run(
-            &source_path,
-            &source_path.join("gyp_uv.py"),
-            &["-f", "make"],
-        )?;
-
-        let make = find_executable("make").expect("`make` is required");
-        let mut build_cmd = build_command(&source_path, &make, &["-C", "out"]);
-        build_cmd.env("BUILDTYPE", "Release");
-        println!("- build...");
-        run(build_cmd)?;
+        build
+            .define("_FILE_OFFSET_BITS", "64")
+            .define("_LARGEFILE_SOURCE", None)
+            .file(unix_path.join("async.c"))
+            .file(unix_path.join("core.c"))
+            .file(unix_path.join("dl.c"))
+            .file(unix_path.join("fs.c"))
+            .file(unix_path.join("getaddrinfo.c"))
+            .file(unix_path.join("getnameinfo.c"))
+            .file(unix_path.join("loop-watcher.c"))
+            .file(unix_path.join("loop.c"))
+            .file(unix_path.join("pipe.c"))
+            .file(unix_path.join("poll.c"))
+            .file(unix_path.join("process.c"))
+            .file(unix_path.join("signal.c"))
+            .file(unix_path.join("stream.c"))
+            .file(unix_path.join("tcp.c"))
+            .file(unix_path.join("thread.c"))
+            .file(unix_path.join("tty.c"))
+            .file(unix_path.join("udp.c"));
     }
 
-    Ok(true)
-}
+    // CMakeLists.txt has some special additions for AIX here; how do I test for it?
 
-fn build_with_autotools<S: AsRef<OsStr>>(sh: &S, force: bool) -> Result<bool> {
-    println!("Building libuv with autotools...");
-
-    let force = force || force_rebuild();
-    let outdir: PathBuf = env::var("OUT_DIR").unwrap().into();
-    let source_path = outdir.join(LIBUV_SOURCE_PATH);
-    let lib_path = source_path.join(".libs");
-    println!(
-        "cargo:rustc-link-search=native={}",
-        lib_path.to_string_lossy()
-    );
-    println!("cargo:rustc-link-lib=static=uv");
-    if lib_path.join("libuv.a").exists() && !force {
-        println!("- build exists; skipping...");
-        return Ok(false);
+    if android {
+        println!("cargo:rustc-link-lib=dl");
+        build
+            .file(unix_path.join("android-ifaddrs.c"))
+            .file(unix_path.join("linux-core.c"))
+            .file(unix_path.join("linux-inotify.c"))
+            .file(unix_path.join("linux-syscalls.c"))
+            .file(unix_path.join("procfs-exepath.c"))
+            .file(unix_path.join("pthread-fixes.c"))
+            .file(unix_path.join("sysinfo-loadavg.c"));
     }
 
-    // run autogen
-    println!("- autogen...");
-    quick_run(&source_path, &sh, &["autogen.sh"])?;
+    // in CMakeLists.txt, this also tests for OS/390
+    if apple || android || linux {
+        build.file(unix_path.join("proctitle.c"));
+    }
 
-    // configure
-    println!("- configure...");
-    quick_run(&source_path, &source_path.join("configure"), &[])?;
+    if dragonfly || freebsd {
+        build.file(unix_path.join("freebsd.c"));
+    }
 
-    // make
-    let make = find_executable("make").expect("`make` is required");
-    println!("- build...");
-    quick_run(&source_path, &make, &[])?;
+    if dragonfly || freebsd || netbsd || openbsd {
+        build
+            .file(unix_path.join("posix-hrtime.c"))
+            .file(unix_path.join("bsd-proctitle.c"));
+        println!("cargo:rustc-link-lib=kvm");
+    }
 
-    Ok(true)
+    if apple || dragonfly || freebsd || netbsd || openbsd {
+        build
+            .file(unix_path.join("bsd-ifaddrs.c"))
+            .file(unix_path.join("kqueue.c"));
+    }
+
+    if apple {
+        build
+            .define("_DARWIN_UNLIMITED_SELECT", "1")
+            .define("_DARWIN_USE_64_BIT_INODE", "1")
+            .file(unix_path.join("darwin-proctitle.c"))
+            .file(unix_path.join("darwin.c"))
+            .file(unix_path.join("fsevents.c"));
+    }
+
+    if linux {
+        build
+            .define("_GNU_SOURCE", None)
+            .define("_POSIX_C_SOURCE", "200112")
+            .file(unix_path.join("linux-core.c"))
+            .file(unix_path.join("linux-inotify.c"))
+            .file(unix_path.join("linux-syscalls.c"))
+            .file(unix_path.join("procfs-exepath.c"))
+            .file(unix_path.join("sysinfo-loadavg.c"));
+        println!("cargo:rustc-link-lib=dl");
+        println!("cargo:rustc-link-lib=rt");
+    }
+
+    if netbsd {
+        build.file(unix_path.join("netbsd.c"));
+    }
+
+    if openbsd {
+        build.file(unix_path.join("openbsd.c"));
+    }
+
+    // CMakeLists.txt has a check for OS/390 here again
+
+    if solaris {
+        build
+            .define("__EXTENSIONS__", None)
+            .define("_XOPEN_SOURCE", "500")
+            .file(unix_path.join("no-proctitle.c"))
+            .file(unix_path.join("sunos.c"));
+        println!("cargo:rustc-link-lib=kstat");
+        println!("cargo:rustc-link-lib=nsl");
+        println!("cargo:rustc-link-lib=sendfile");
+        println!("cargo:rustc-link-lib=socket");
+    }
+
+    build.compile("uv");
+    Ok(())
 }
 
-fn force_regenerate_bindings() -> bool {
-    env::var_os("LIBUV_REGENERATE_BINDINGS").is_some()
-}
-
-fn generate_bindings<P: AsRef<Path>>(header_path: &P, force: bool) -> Result<()> {
+fn generate_bindings<P: AsRef<Path>>(include_path: &P) -> Result<()> {
     println!("Generating bindings for libuv...");
 
-    let force = force || force_regenerate_bindings();
-    let outdir = PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings.rs");
-    if outdir.exists() && !force {
-        println!("- bindings exist; skipping...");
-        return Ok(());
-    }
-
     // bindgen needs the path as a String
-    let include_path = header_path.as_ref().parent().unwrap().to_string_lossy();
-    let header_path = header_path.as_ref().to_string_lossy();
+    let include_path = include_path.as_ref();
+    let header_path = include_path.join("uv.h");
 
     // generate ffi bindings
     let bindings = bindgen::Builder::default()
-        .header(header_path)
-        .clang_arg(format!("-I{}", include_path))
+        .header(header_path.to_string_lossy())
+        .clang_arg(format!("-I{}", include_path.display()))
         .whitelist_type("uv_.+")
         .whitelist_function("uv_.+")
         .whitelist_var("uv_.+")
@@ -396,6 +281,7 @@ fn generate_bindings<P: AsRef<Path>>(header_path: &P, force: bool) -> Result<()>
         .map_err(|_| Error::BindgenError)?;
 
     // write to file
+    let outdir = PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings.rs");
     bindings
         .write_to_file(&outdir)
         .map_err(|e| Error::PathError(outdir.to_string_lossy().into(), e))?;
@@ -404,51 +290,21 @@ fn generate_bindings<P: AsRef<Path>>(header_path: &P, force: bool) -> Result<()>
 }
 
 fn main() {
-    println!("cargo:rerun-if-env-changed=LIBUV_REDOWNLOAD");
-    println!("cargo:rerun-if-env-changed=LIBUV_REBUILD");
-    println!("cargo:rerun-if-env-changed=LIBUV_REGENERATE_BINDINGS");
+    let source_path = PathBuf::from("libuv");
+    let mut include_path = source_path.join("include");
 
-    // If we find libuv with pkg-config, we just need bindings... if there are _any_ errors, just
-    // move on to downloading. Either we don't have pkg-config, or we don't have libuv.
-    let max_version = build_pkgconfig_max_version();
-    let pkgconfig_result = pkg_config::Config::new()
-        .range_version(&LIBUV_VERSION[1..]..max_version.as_ref())
-        .env_metadata(true)
-        .probe("libuv");
-    if let Ok(libuv) = pkgconfig_result {
-        println!("Resolving libuv with pkg-config");
-        let bindings_sentinal = PathBuf::from(env::var("OUT_DIR").unwrap()).join(format!(
-            "pkgconfig-{}",
-            libuv.version.lines().nth(0).unwrap()
-        ));
-        for include_path in libuv.include_paths {
-            let header_path = include_path.join("uv.h");
-            if header_path.exists() {
-                generate_bindings(&header_path, !bindings_sentinal.exists()).unwrap();
-                touch(&bindings_sentinal).unwrap();
-                return;
-            }
+    // try pkg-config first
+    if let Some(maybe_include) = try_pkgconfig() {
+        // pkg-config successfully found a version of libuv, but may not be able to find headers...
+        // that's ok, though, we have our own.
+        if let Some(incl) = maybe_include {
+            include_path = incl;
         }
-        panic!("Could not find `uv.h` from pkg-config");
+    } else {
+        build(&source_path).unwrap();
     }
 
-    // We need git to download libuv
-    let git = find_executable("git").expect("`git` is required");
-    let (source_path, downloaded) = download_libuv(&git).unwrap();
-
-    // libuv has a couple build systems... cmake seems to be the most straightforward, so we'll try
-    // that first... Next up would be gyp which will require python, followed by good ol'
-    // autotools. Autotools, of courses, won't work on Windows.
-    let cmake = find_executable("cmake");
-    let python = find_executable("python");
-    let sh = find_executable("sh");
-    match (cmake, python, sh) {
-        (Some(ref cmake), _, _) => build_with_cmake(&cmake, downloaded).unwrap(),
-        (_, Some(_), _) => build_with_gyp(&git, downloaded).unwrap(),
-        (_, _, Some(ref sh)) => build_with_autotools(&sh, downloaded).unwrap(),
-        _ => panic!("Requires either cmake, python2 (for gyp) or sh and the autotools"),
-    };
-
-    let header_path = source_path.join("include").join("uv.h");
-    generate_bindings(&header_path, downloaded).unwrap();
+    // generate bindings
+    generate_bindings(&include_path).unwrap();
+    println!("cargo:include={}", include_path.to_string_lossy());
 }
