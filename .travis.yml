@@ -1,3 +1,5 @@
+if: branch = master || branch =~ /^v\d+\.\d+\.x$/
+
 language: rust
 rust:
   - stable
@@ -23,3 +25,25 @@ script:
   - cargo build -v
   - find target/debug/build -path "*/libuv-sys-*/output" -exec cat '{}' \;
   - cargo test
+
+jobs:
+  include:
+    - stage: publish
+      if: type = push && fork = false && branch =~ /^v\d+\.\d+\.x$/
+      os: linux
+      script: echo "Publishing release..."
+      before_deploy:
+        - git config --local user.name $GIT_USER_NAME
+        - git config --local user.email $GIT_USER_EMAIL
+        - export TRAVIS_TAG=$(grep 'version =' Cargo.toml | awk -F'"' '{print "v" $2}')
+        - export PREV_TAG=$({ echo $TRAVIS_TAG; git tag; } | sort -V | grep -B1 $TRAVIS_TAG | head -n 1)
+        - |
+          { echo '## Changelog'; echo; git log --pretty=format:'%h %s' "${PREV_TAG}.." 2>/dev/null; } > RELEASELOG.md || true
+        - git tag -a $TRAVIS_TAG -m $TRAVIS_TAG
+      deploy:
+        - provider: releases
+          file: README.md
+          release_notes_file: RELEASELOG.md
+          edge: true
+          on:
+            all_branches: true
