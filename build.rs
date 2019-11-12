@@ -4,7 +4,7 @@ use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 
-static LIBUV_VERSION: &str = "v1.30";
+static LIBUV_VERSION: &str = "1.30.1";
 
 #[derive(Debug)]
 enum Error {
@@ -34,8 +34,9 @@ type Result<T> = std::result::Result<T, Error>;
 
 fn build_pkgconfig_max_version() -> String {
     let dotidx = LIBUV_VERSION.find('.').unwrap();
-    let next_minor_version = LIBUV_VERSION[(dotidx + 1)..].parse::<usize>().unwrap() + 1;
-    format!("{}.{}", &LIBUV_VERSION[1..dotidx], next_minor_version)
+    let dotidx2 = LIBUV_VERSION[(dotidx + 1)..].find('.').unwrap() + dotidx + 1;
+    let next_minor_version = LIBUV_VERSION[(dotidx + 1)..dotidx2].parse::<usize>().unwrap() + 1;
+    format!("{}.{}.0", &LIBUV_VERSION[..dotidx], next_minor_version)
 }
 
 fn try_pkgconfig() -> Option<Option<PathBuf>> {
@@ -48,7 +49,7 @@ fn try_pkgconfig() -> Option<Option<PathBuf>> {
     // move on to building. Either we don't have pkg-config, or we don't have libuv.
     let max_version = build_pkgconfig_max_version();
     let pkgconfig_result = pkg_config::Config::new()
-        .range_version(&LIBUV_VERSION[1..]..max_version.as_ref())
+        .range_version(&LIBUV_VERSION[..]..max_version.as_ref())
         .env_metadata(true)
         .probe("libuv");
     if let Ok(libuv) = pkgconfig_result {
