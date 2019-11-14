@@ -1,5 +1,5 @@
 #!/bin/bash
-set -Eeuxo pipefail
+set -Eeuo pipefail
 
 send_email() {
   local body="$1"
@@ -63,7 +63,7 @@ fi
 echo "New libuv-sys version: $LIBUV_SYS_NEXT_VER"
 
 # checkout branch
-if git branch | grep -q "${LIBUV_SYS_BRANCH}"; then
+if git branch -r | grep -q "${LIBUV_SYS_BRANCH}"; then
   git checkout "$LIBUV_SYS_BRANCH"
 else
   git checkout -b "$LIBUV_SYS_BRANCH" "$LIBUV_SYS_PREV_VER"
