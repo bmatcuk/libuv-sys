@@ -4,7 +4,7 @@ use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 
-static LIBUV_VERSION: &str = "1.33.0";
+static LIBUV_VERSION: &str = "1.33.1";
 
 #[derive(Debug)]
 enum Error {
