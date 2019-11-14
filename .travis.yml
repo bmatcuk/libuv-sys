@@ -31,35 +31,22 @@ jobs:
     - stage: "prepare new libuv version"
       if: branch = master && env(LIBUV_TAG_URL) =~ /^https:\/\/github.com\/libuv\/libuv\/releases\/tag\/v\d+\.\d+\.\d+/
       os: linux
+      dist: bionic
       language: bash
-      before_install:
-        - echo "Preparing a build for a new version of libuv..."
-      script:
-        - git config --local user.name $GIT_USER_NAME
-        - git config --local user.email $GIT_USER_EMAIL
-        - git remote set-url origin https://${GITHUB_TOKEN}@github.com/bmatcuk/libuv-sys.git
-        - '[[ "$LIBUV_TAG_URL" =~ https://github.com/libuv/libuv/releases/tag/(v[0-9]+.[0-9]+.[0-9]+) ]]'
-        - export LIBUV_VERSION="${BASH_REMATCH[1]}"
-        - export LIBUV_MAJ_MIN="${LIBUV_VERSION%.*}"
-        - export LIBUV_SYS_BRANCH="${LIBUV_MAJ_MIN}.x"
-        - export LIBUV_SYS_PREV_VER=$(git tag | grep -q "${LIBUV_MAJ_MIN}." && git tag | grep "${LIBUV_MAJ_MIN}." | sort -V | tail -n 1 || { echo $LIBUV_VERSION; git tag; } | sort -V | grep -B1 "$LIBUV_VERSION" | head -n 1)
-        - export LIBUV_SYS_NEXT_VER=$(git tag | grep -q "${LIBUV_MAJ_MIN}." && [[ "$LIBUV_SYS_PREV_VER" =~ .([0-9]+)$ ]] && echo "${LIBUV_MAJ_MIN}.$(( "${BASH_REMATCH[1]}" + 1 ))" || echo "${LIBUV_MAJ_MIN}.0")
-        - 'echo "libuv version: $LIBUV_VERSION"'
-        - 'echo "libuv maj.min: $LIBUV_MAJ_MIN"'
-        - 'echo "libuv-sys branch: $LIBUV_SYS_BRANCH"'
-        - 'echo "libuv-sys prev ver: $LIBUV_SYS_PREV_VER"'
-        - 'echo "libuv-sys next ver: $LIBUV_SYS_NEXT_VER"'
-        - git branch | grep -q "$LIBUV_SYS_BRANCH" && git checkout "$LIBUV_SYS_BRANCH" || git checkout -b "$LIBUV_SYS_BRANCH" "$LIBUV_SYS_PREV_VER"
-        - '{ pushd libuv; git checkout "$LIBUV_VERSION"; popd; }'
-        - sed -i -e '/^version =/s/".*"/"'"${LIBUV_SYS_NEXT_VER#v}"'"/' Cargo.toml
-        - sed -i -e '/^static LIBUV_VERSION:/s/".*"/"'"${LIBUV_SYS_NEXT_VER%.*}"'"/' build.rs
-        - git add Cargo.toml build.rs libuv
-        - git commit -m "Preparing build for libuv $LIBUV_VERSION"
-        - git push --all
+      addons:
+        apt:
+          packages:
+            - jo
+      before_install: echo "Preparing a build for a new version of libuv..."
+      script: bash scripts/prepare.sh
     - stage: publish
       if: type = push && fork = false && branch =~ /^v\d+\.\d+\.x$/ && env(LIBUV_TAG_URL) IS blank
       os: linux
       language: bash
+      addons:
+        apt:
+          packages:
+            - jo
       before_install: echo "Preparing to publish release..."
       script: echo "Publishing release..."
       before_deploy:
