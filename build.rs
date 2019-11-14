@@ -4,7 +4,7 @@ use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 
-static LIBUV_VERSION: &str = "1.32.0";
+static LIBUV_VERSION: &str = "1.33.0";
 
 #[derive(Debug)]
 enum Error {
@@ -108,6 +108,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
         .file(src_path.join("fs-poll.c"))
         .file(src_path.join("idna.c"))
         .file(src_path.join("inet.c"))
+        .file(src_path.join("random.c"))
         .file(src_path.join("strscpy.c"))
         .file(src_path.join("threadpool.c"))
         .file(src_path.join("timer.c"))
@@ -172,6 +173,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
             .file(unix_path.join("pipe.c"))
             .file(unix_path.join("poll.c"))
             .file(unix_path.join("process.c"))
+            .file(unix_path.join("random-devurandom.c"))
             .file(unix_path.join("signal.c"))
             .file(unix_path.join("stream.c"))
             .file(unix_path.join("tcp.c"))
@@ -216,6 +218,14 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
             .file(unix_path.join("kqueue.c"));
     }
 
+    if freebsd {
+        build.file(unix_path.join("random-getrandom.c"));
+    }
+
+    if apple || openbsd {
+        build.file(unix_path.join("random-getentropy.c"));
+    }
+
     if apple {
         build
             .define("_DARWIN_UNLIMITED_SELECT", "1")
@@ -233,6 +243,8 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
             .file(unix_path.join("linux-inotify.c"))
             .file(unix_path.join("linux-syscalls.c"))
             .file(unix_path.join("procfs-exepath.c"))
+            .file(unix_path.join("random-getrandom.c"))
+            .file(unix_path.join("random-sysctl.c"))
             .file(unix_path.join("sysinfo-loadavg.c"));
         println!("cargo:rustc-link-lib=dl");
         println!("cargo:rustc-link-lib=rt");
