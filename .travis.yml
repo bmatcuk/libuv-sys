@@ -42,6 +42,7 @@ jobs:
     - stage: publish
       if: type = push && fork = false && branch =~ /^v\d+\.\d+\.x$/ && env(LIBUV_TAG_URL) IS blank
       os: linux
+      dist: bionic
       language: bash
       addons:
         apt:
