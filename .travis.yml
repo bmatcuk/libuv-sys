@@ -59,7 +59,7 @@ jobs:
         - export LIBUV_VERSION=$({ cd libuv; git describe --tags; })
         - export LIBUV_TAG="libuv-${LIBUV_VERSION}"
         - '{ echo -e "Corresponds to libuv ${LIBUV_VERSION}.\n\n## Changelog\n\n"; git log --pretty=format:"%h %s" "${PREV_TAG}.." 2>/dev/null; } > RELEASELOG.md || true'
-        - git tag $LIBUV_TAG
+        - git tag $LIBUV_TAG || true
         - git tag -a $TRAVIS_TAG -m "Corresponds to libuv ${LIBUV_VERSION}"
         - git push --tags
       deploy:
