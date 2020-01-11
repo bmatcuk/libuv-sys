@@ -67,7 +67,7 @@ This is frequently useful when using [libuv] to cast a `uv_SOMETHING_t` to a
 `uv_handle_t`. For example:
 
 ```rust
-let tty: uv_tty_t = mem::zeroed();
+let mut tty: uv_tty_t = unsafe { mem::zeroed() };
 
 // without the macro, you'd need to cast the reference to a raw pointer of the
 // same type, and then cast that as a raw pointer of the target type:

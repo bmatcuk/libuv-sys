@@ -12,10 +12,23 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 /// # Example
 ///
 /// ```
-/// let tty: uv_tty_t = mem::zeroed();
+/// # #[macro_use] extern crate libuv_sys;
+/// #
+/// # use libuv_sys::{uv_handle_t, uv_tty_t};
+/// # use std::mem;
+/// #
+/// # fn main() {
+/// #
+/// let mut tty: uv_tty_t = unsafe { mem::zeroed() };
 ///
-/// // much more wieldy than: &mut tty as *mut uv_tty_t as *mut uv_handle_t
+/// // without the macro, you'd need to cast the reference to a raw pointer of the
+/// // same type, and then cast that as a raw pointer of the target type:
+/// let handle: *mut uv_handle_t = &mut tty as *mut uv_tty_t as *mut uv_handle_t;
+///
+/// // the macro is much more wieldy:
 /// let handle: *mut uv_handle_t = uv_handle!(&mut tty);
+/// #
+/// # }
 /// ```
 #[macro_export]
 macro_rules! uv_handle {
