@@ -6,7 +6,6 @@ rust:
 os:
   - linux
   - osx
-  # - windows
 
 addons:
   apt:
@@ -28,6 +27,8 @@ script:
 
 jobs:
   include:
+    - os: windows
+      rust: stable-x86_64-pc-windows-msvc
     - stage: "prepare new libuv version"
       if: branch = master && env(LIBUV_TAG_URL) =~ /^https:\/\/github.com\/libuv\/libuv\/releases\/tag\/v\d+\.\d+\.\d+/
       os: linux

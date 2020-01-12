@@ -36,6 +36,10 @@ If you need a specific patch version of libuv, check the [releases] page to
 find the version of libuv-sys that corresponds to the patch of libuv that you
 need.
 
+Under the hood, libuv-sys uses [bindgen] to generate the bindings to [libuv].
+If you're having trouble compiling libuv-sys, check out the [bindgen]
+documentation to make sure you have all the required software installed.
+
 ## Usage
 Import the library in your project:
 
@@ -79,6 +83,20 @@ let handle: *mut uv_handle_t = uv_handle!(&mut tty);
 
 NOTE: this macro is only available in v1.34.1 and newer!
 
+## Cross-Platform Considerations
+It appears the type of uv_buf_t.len is different on Windows. A simple solution
+is to use a usize (which appears to be the default elsewhere) and then any
+place that you read from or write to a uv_buf_t.len, simply add a `as _` to the
+end and the compiler will do the right thing. For example:
+
+```rust
+let buf: uv_buf_t = { base: my_ptr, len: my_len as _ };
+```
+
+Speaking of Windows, because [bindgen] is used to generate the bindings, you'll
+need to use rust's msvc toolchain to compile libuv-sys.
+
+[bindgen]: https://rust-lang.github.io/rust-bindgen/
 [examples]: https://github.com/bmatcuk/libuv-sys/tree/master/examples
 [libuv's documentation]: http://docs.libuv.org
 [libuv]: https://libuv.org/

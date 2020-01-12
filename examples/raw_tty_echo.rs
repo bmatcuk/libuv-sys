@@ -2,24 +2,26 @@
 extern crate libuv_sys;
 
 use libuv_sys::{
-    uv_buf_t, uv_close, uv_default_loop, uv_err_name, uv_handle_get_data, uv_handle_set_data,
-    uv_handle_t, uv_is_closing, uv_loop_close, uv_loop_t, uv_read_start, uv_read_stop, uv_run,
-    uv_run_mode_UV_RUN_DEFAULT, uv_stream_t, uv_strerror, uv_tty_init,
+    uv_buf_t, uv_close, uv_default_loop, uv_err_name, uv_file, uv_handle_get_data,
+    uv_handle_set_data, uv_handle_t, uv_is_closing, uv_loop_close, uv_loop_t, uv_read_start,
+    uv_read_stop, uv_run, uv_run_mode_UV_RUN_DEFAULT, uv_stream_t, uv_strerror, uv_tty_init,
     uv_tty_mode_t_UV_TTY_MODE_RAW, uv_tty_reset_mode, uv_tty_set_mode, uv_tty_t, uv_walk, uv_write,
     uv_write_t,
 };
 use std::error::Error;
 use std::ffi::CStr;
 use std::fmt;
-use std::io::{stdin, stdout};
 use std::mem;
 use std::os::raw::{c_char, c_int, c_void};
-use std::os::unix::io::AsRawFd;
 use std::ptr;
+
+const STDIN_FILENO: uv_file = 0;
+const STDOUT_FILENO: uv_file = 1;
 
 /// An error returned by libuv
 #[derive(Clone, Debug)]
 struct UVError {
+    func: String,
     code: c_int,
 }
 
@@ -28,7 +30,7 @@ impl fmt::Display for UVError {
         unsafe {
             let err = CStr::from_ptr(uv_strerror(self.code)).to_string_lossy();
             let name = CStr::from_ptr(uv_err_name(self.code)).to_string_lossy();
-            write!(f, "{} ({})", err, name)
+            write!(f, "Error calling {}: {} ({})", self.func, err, name)
         }
     }
 }
@@ -43,12 +45,13 @@ impl Error for UVError {
 type Result<T> = std::result::Result<T, UVError>;
 
 /// Turns the return code from a libuv function into a Result.
-fn uvret(code: c_int) -> Result<()> {
-    if code >= 0 {
-        Ok(())
-    } else {
-        Err(UVError { code })
-    }
+macro_rules! uvret {
+    ($func:ident$args:tt) => {
+        match $func$args {
+            code if code < 0 => Err(UVError { func: stringify!($func).to_owned(), code }),
+            _ => Ok(())
+        }
+    };
 }
 
 /// All of the structs that we need to pass back-and-forth with libuv must live in a predictable,
@@ -103,17 +106,12 @@ impl Globals {
         // stack!
 
         // Initialize tty for stdin and ttyout for stdout
-        uvret(uv_tty_init(
-            r#loop,
-            &mut (*globals).tty,
-            stdin().as_raw_fd(),
-            0,
-        ))?;
-        uvret(uv_tty_init(
+        uvret!(uv_tty_init(r#loop, &mut (*globals).tty, STDIN_FILENO, 0))?;
+        uvret!(uv_tty_init(
             r#loop,
             &mut (*globals).ttyout,
-            stdout().as_raw_fd(),
-            0,
+            STDOUT_FILENO,
+            0
         ))?;
 
         // uv_handle_t types have a data pointer we can use to store any arbitrary data. We'll
@@ -138,7 +136,7 @@ impl Globals {
 
 /// Stop the libuv loop by stopping all of the handles that we've started.
 unsafe fn stop(globals: *mut Globals) -> Result<()> {
-    uvret(uv_read_stop(uv_handle!(&mut (*globals).tty)))
+    uvret!(uv_read_stop(uv_handle!(&mut (*globals).tty)))
 }
 
 /// This function is used by uv_read_start to allocate memory for the read.
@@ -153,7 +151,7 @@ unsafe extern "C" fn alloc_cb(
     // mem::forget() on it so that it will not be deallocated when this method returns.
     let mut data = Vec::with_capacity(suggested_size);
     (*buf).base = data.as_mut_ptr() as *mut c_char;
-    (*buf).len = suggested_size;
+    (*buf).len = suggested_size as _;
     mem::forget(data);
 }
 
@@ -162,7 +160,7 @@ unsafe extern "C" fn alloc_cb(
 unsafe extern "C" fn write_cb(req: *mut uv_write_t, _status: c_int) {
     // reconstruct the vec from the buffer and drop it
     let globals = Globals::get_from_handle(uv_handle!(req));
-    let len = (*globals).write_buf.len;
+    let len = (*globals).write_buf.len as _;
     mem::drop(Vec::from_raw_parts((*globals).write_buf.base, len, len));
 }
 
@@ -172,10 +170,10 @@ unsafe fn write(globals: *mut Globals, mut data: Vec<u8>, len: usize) -> Result<
     // underlying data, and then calls mem::forget on the vec so that it is not deallocated by
     // rust. It'll be deallocated later by write_cb() above when the write finishes.
     (*globals).write_buf.base = data.as_mut_ptr() as *mut c_char;
-    (*globals).write_buf.len = len;
+    (*globals).write_buf.len = len as _;
     mem::forget(data);
 
-    uvret(uv_write(
+    uvret!(uv_write(
         uv_handle!(&mut (*globals).write_req),
         uv_handle!(&mut (*globals).ttyout),
         uv_handle!(&(*globals).write_buf),
@@ -193,7 +191,8 @@ unsafe extern "C" fn read_cb(stream: *mut uv_stream_t, nread: isize, buf: *const
         // deallocate the vec when it falls out of scope. We'll also allocate a new vec to hold the
         // output we'd like to create. Then we'll loop through the input and copy it over to the
         // output, creating "escapes" for characters that cannot be printed.
-        let data: Vec<u8> = Vec::from_raw_parts((*buf).base as *mut u8, nread as usize, (*buf).len);
+        let data: Vec<u8> =
+            Vec::from_raw_parts((*buf).base as *mut u8, nread as usize, (*buf).len as _);
         let mut outdata = Vec::with_capacity((nread as usize) * 2 + 1);
         for chr in data {
             match chr {
@@ -241,7 +240,10 @@ unsafe extern "C" fn read_cb(stream: *mut uv_stream_t, nread: isize, buf: *const
         // an error occurred
         end = true;
         if (*globals).err.is_none() {
-            (*globals).err = Some(UVError { code: nread as c_int });
+            (*globals).err = Some(UVError {
+                func: "read_cb".to_owned(),
+                code: nread as c_int,
+            });
         }
     }
 
@@ -268,11 +270,11 @@ unsafe fn run() -> std::result::Result<(), Box<dyn Error>> {
     let globals = Globals::init(r#loop)?;
 
     // set to raw mode and start reading on the tty stream
-    uvret(uv_tty_set_mode(
+    uvret!(uv_tty_set_mode(
         uv_handle!(&mut (*globals).tty),
         uv_tty_mode_t_UV_TTY_MODE_RAW,
     ))?;
-    uvret(uv_read_start(
+    uvret!(uv_read_start(
         uv_handle!(&mut (*globals).tty),
         Some(alloc_cb),
         Some(read_cb),
@@ -286,19 +288,19 @@ unsafe fn run() -> std::result::Result<(), Box<dyn Error>> {
     write(globals, data, len)?;
 
     // start the loop - this blocks until the loop is stopped
-    uvret(uv_run(r#loop, uv_run_mode_UV_RUN_DEFAULT))?;
+    uvret!(uv_run(r#loop, uv_run_mode_UV_RUN_DEFAULT))?;
 
     // reset the tty mode
-    uvret(uv_tty_reset_mode())?;
+    uvret!(uv_tty_reset_mode())?;
 
     // mark all handles for closing then restart the loop... we need to start a new loop here so
     // that the handles will actually be closed. The loop should be fairly short-lived because all
     // it needs to do is close all the handles.
     uv_walk(r#loop, Some(walk_and_close_cb), ptr::null_mut());
-    uvret(uv_run(r#loop, uv_run_mode_UV_RUN_DEFAULT))?;
+    uvret!(uv_run(r#loop, uv_run_mode_UV_RUN_DEFAULT))?;
 
     // close the loop
-    uvret(uv_loop_close(r#loop))?;
+    uvret!(uv_loop_close(r#loop))?;
 
     // deallocate our libuv structs on the heap
     let err = (*globals).err.clone();
@@ -314,6 +316,6 @@ unsafe fn run() -> std::result::Result<(), Box<dyn Error>> {
 fn main() {
     // run the program and print any errors
     if let Err(err) = unsafe { run() } {
-        println!("Error: {}", err);
+        println!("{}", err);
     }
 }
