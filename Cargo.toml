@@ -1,15 +1,20 @@
 [package]
-name = "libuv-sys"
-links = "uv"
-version = "1.31.0"
+name = "libuv-sys2"
+version = "1.31.1"
 description = "Thin FFI bindings for libuv"
+homepage = "https://github.com/bmatcuk/libuv-sys/"
+repository = "https://github.com/bmatcuk/libuv-sys/"
 categories = ["command-line-interface", "external-ffi-bindings"]
 keywords = ["events", "libevent", "loop"]
 readme = "README.md"
-license = "MIT OR Apache-2.0"
 license-file = "LICENSE"
 authors = ["Bob Matcuk <bmatcuk@gmail.com>"]
 edition = "2018"
+links = "uv"
+
+[badges]
+travis-ci = { repository = "bmatcuk/libuv-sys" }
+maintenance = { status = "actively-developed" }
 
 [build-dependencies]
 bindgen = "0.51"

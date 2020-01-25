@@ -6,7 +6,6 @@ rust:
 os:
   - linux
   - osx
-  - windows
 
 addons:
   apt:
@@ -28,6 +27,8 @@ script:
 
 jobs:
   include:
+    - os: windows
+      rust: stable-x86_64-pc-windows-msvc
     - stage: "prepare new libuv version"
       if: branch = master && env(LIBUV_TAG_URL) =~ /^https:\/\/github.com\/libuv\/libuv\/releases\/tag\/v\d+\.\d+\.\d+/
       os: linux
@@ -42,15 +43,12 @@ jobs:
     - stage: publish
       if: type = push && fork = false && branch =~ /^v\d+\.\d+\.x$/ && env(LIBUV_TAG_URL) IS blank
       os: linux
-      dist: bionic
-      language: bash
+      rust: stable
       addons:
         apt:
           packages:
-            - jo
       before_install: echo "Preparing to publish release..."
-      script: echo "Publishing release..."
-      before_deploy:
+      script:
         - git config --local user.name $GIT_USER_NAME
         - git config --local user.email $GIT_USER_EMAIL
         - git remote set-url origin https://${GITHUB_TOKEN}@github.com/bmatcuk/libuv-sys.git
@@ -59,7 +57,7 @@ jobs:
         - export LIBUV_VERSION=$({ cd libuv; git describe --tags; })
         - export LIBUV_TAG="libuv-${LIBUV_VERSION}"
         - '{ echo -e "Corresponds to libuv ${LIBUV_VERSION}.\n\n## Changelog\n\n"; git log --pretty=format:"%h %s" "${PREV_TAG}.." 2>/dev/null; } > RELEASELOG.md || true'
-        - git tag $LIBUV_TAG
+        - git tag $LIBUV_TAG || true
         - git tag -a $TRAVIS_TAG -m "Corresponds to libuv ${LIBUV_VERSION}"
         - git push --tags
       deploy:
@@ -67,6 +65,11 @@ jobs:
           file: README.md
           release_notes_file: RELEASELOG.md
           edge: true
+          on:
+            all_branches: true
+        - provider: cargo
+          edge: true
+          cleanup: true
           on:
             all_branches: true
 

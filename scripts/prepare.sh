@@ -42,7 +42,6 @@ echo "Previous libuv version: $LIBUV_PREV_VER"
 
 # setup variables for libuv-sys stuff
 LIBUV_SYS_BRANCH="${LIBUV_MAJ_MIN}.x"
-LIBUV_SYS_HAS_BRANCH="$(git branch | grep -q "$LIBUV_SYS_BRANCH" && echo "TRUE")"
 LIBUV_SYS_PREV_VER=$(git describe "libuv-${LIBUV_PREV_VER}" 2>/dev/null || echo -n "")
 if [ -z "$LIBUV_SYS_PREV_VER" ]; then
   MSG="Cannot automatically prepare a new build for libuv $LIBUV_VERSION because libuv-sys does not support libuv $LIBUV_PREV_VER"
@@ -64,8 +63,8 @@ fi
 echo "New libuv-sys version: $LIBUV_SYS_NEXT_VER"
 
 # checkout branch
-if git branch | grep -q "${LIBUV_SYS_BRANCH}"; then
-  git checkout "$LIBUV_SYS_BRANCH"
+if git branch -r | grep -q "${LIBUV_SYS_BRANCH}"; then
+  git checkout --track "origin/$LIBUV_SYS_BRANCH"
 else
   git checkout -b "$LIBUV_SYS_BRANCH" "$LIBUV_SYS_PREV_VER"
 fi
