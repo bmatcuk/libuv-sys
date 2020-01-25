@@ -43,15 +43,12 @@ jobs:
     - stage: publish
       if: type = push && fork = false && branch =~ /^v\d+\.\d+\.x$/ && env(LIBUV_TAG_URL) IS blank
       os: linux
-      dist: bionic
-      language: bash
+      rust: stable
       addons:
         apt:
           packages:
-            - jo
       before_install: echo "Preparing to publish release..."
-      script: echo "Publishing release..."
-      before_deploy:
+      script:
         - git config --local user.name $GIT_USER_NAME
         - git config --local user.email $GIT_USER_EMAIL
         - git remote set-url origin https://${GITHUB_TOKEN}@github.com/bmatcuk/libuv-sys.git
@@ -68,6 +65,11 @@ jobs:
           file: README.md
           release_notes_file: RELEASELOG.md
           edge: true
+          on:
+            all_branches: true
+        - provider: cargo
+          edge: true
+          cleanup: true
           on:
             all_branches: true
 

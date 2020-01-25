@@ -12,9 +12,9 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 /// # Example
 ///
 /// ```
-/// # #[macro_use] extern crate libuv_sys;
+/// # #[macro_use] extern crate libuv_sys2;
 /// #
-/// # use libuv_sys::{uv_handle_t, uv_tty_t};
+/// # use libuv_sys2::{uv_handle_t, uv_tty_t};
 /// # use std::mem;
 /// #
 /// # fn main() {

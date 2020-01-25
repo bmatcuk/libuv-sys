@@ -1,7 +1,7 @@
 #[macro_use]
-extern crate libuv_sys;
+extern crate libuv_sys2;
 
-use libuv_sys::{
+use libuv_sys2::{
     uv_buf_t, uv_close, uv_default_loop, uv_err_name, uv_file, uv_handle_get_data,
     uv_handle_set_data, uv_handle_t, uv_is_closing, uv_loop_close, uv_loop_t, uv_read_start,
     uv_read_stop, uv_run, uv_run_mode_UV_RUN_DEFAULT, uv_stream_t, uv_strerror, uv_tty_init,
