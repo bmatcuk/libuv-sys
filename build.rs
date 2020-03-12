@@ -4,7 +4,7 @@ use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 
-static LIBUV_VERSION: &str = "1.34.2";
+static LIBUV_VERSION: &str = "1.35.0";
 
 #[derive(Debug)]
 enum Error {
@@ -117,9 +117,11 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
         .file(src_path.join("version.c"));
 
     if cfg!(windows) {
+        // TODO: CMakeLists.txt determines the Windows version and assigns different values to
+        // _WIN32_WINNT below, and optionally includes psapi for Vista only.
+        println!("cargo:rustc-link-lib=psapi");
         println!("cargo:rustc-link-lib=advapi32");
         println!("cargo:rustc-link-lib=iphlpapi");
-        println!("cargo:rustc-link-lib=psapi");
         println!("cargo:rustc-link-lib=shell32");
         println!("cargo:rustc-link-lib=user32");
         println!("cargo:rustc-link-lib=userenv");
@@ -193,6 +195,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
             .file(unix_path.join("linux-syscalls.c"))
             .file(unix_path.join("procfs-exepath.c"))
             .file(unix_path.join("pthread-fixes.c"))
+            .file(unix_path.join("random-getentropy.c"))
             .file(unix_path.join("random-getrandom.c"))
             .file(unix_path.join("random-sysctl-linux.c"))
             .file(unix_path.join("sysinfo-loadavg.c"));
