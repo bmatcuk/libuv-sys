@@ -68,6 +68,28 @@ fn try_pkgconfig() -> Option<Option<PathBuf>> {
     return None
 }
 
+#[cfg(windows)]
+fn windows_version_specific_settings(build: &mut cc::Build) {
+    match nt_version::get() {
+        (6, 0, _) => {
+            // Vista
+            println!("cargo:rustc-link-lib=advapi32");
+            println!("cargo:rustc-link-lib=psapi");
+            println!("cargo:rustc-link-lib=shell32");
+            println!("cargo:rustc-link-lib=user32");
+            build.define("_WIN32_WINNT", "0x0600")
+        },
+        (6, 1, _) => build.define("_WIN32_WINNT", "0x0601"),    // Windows 7
+        (6, 2, _) => build.define("_WIN32_WINNT", "0x0602"),    // Windows 8
+        (6, 3, _) => build.define("_WIN32_WINNT", "0x0603"),    // Windows 8.1
+        (10, _, _) => build.define("_WIN32_WINNT", "0x0A00"),   // Windows 10
+        _ => panic!("This version of Windows is unsupported by libuv.")
+    };
+}
+
+#[cfg(not(windows))]
+fn windows_version_specific_settings(_build: &mut cc::Build) {}
+
 fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
     let src_path = source_path.as_ref().join("src");
     let unix_path = src_path.join("unix");
@@ -117,12 +139,9 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
         .file(src_path.join("version.c"));
 
     if cfg!(windows) {
-        // TODO: CMakeLists.txt determines the Windows version and assigns different values to
-        // _WIN32_WINNT below, and optionally includes psapi for Vista only.
-        println!("cargo:rustc-link-lib=psapi");
-        println!("cargo:rustc-link-lib=advapi32");
+        windows_version_specific_settings(&mut build);
+
         println!("cargo:rustc-link-lib=iphlpapi");
-        println!("cargo:rustc-link-lib=shell32");
         println!("cargo:rustc-link-lib=user32");
         println!("cargo:rustc-link-lib=userenv");
         println!("cargo:rustc-link-lib=ws2_32");
@@ -130,7 +149,6 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
         let win_path = src_path.join("win");
         build
             .define("WIN32_LEAN_AND_MEAN", None)
-            .define("_WIN32_WINNT", "0x0600")
             .file(win_path.join("async.c"))
             .file(win_path.join("core.c"))
             .file(win_path.join("detect-wakeup.c"))
@@ -294,7 +312,7 @@ fn generate_bindings<P: AsRef<Path>>(include_path: &P) -> Result<()> {
         .clang_arg(format!("-I{}", include_path.display()))
         .whitelist_type("uv_.+")
         .whitelist_function("uv_.+")
-        .whitelist_var("uv_.+")
+        .whitelist_var("(?i)uv_.+")
         .generate()
         .map_err(|_| Error::BindgenError)?;
 
