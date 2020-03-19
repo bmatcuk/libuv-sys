@@ -315,8 +315,9 @@ fn generate_bindings<P: AsRef<Path>>(include_path: &P) -> Result<()> {
         .whitelist_var("(?i)uv_.+")
         .whitelist_var("AF_.+")
         .whitelist_var("AI_.+")
-        .whitelist_var("SOCK_.+")
         .whitelist_var("IPPROTO_.+")
+        .whitelist_var("NI_.+")
+        .whitelist_var("SOCK_.+")
         .generate()
         .map_err(|_| Error::BindgenError)?;
 
