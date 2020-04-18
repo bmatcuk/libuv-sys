@@ -4,7 +4,7 @@ use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 
-static LIBUV_VERSION: &str = "1.35.0";
+static LIBUV_VERSION: &str = "1.36.0";
 
 #[derive(Debug)]
 enum Error {
@@ -175,6 +175,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
             .file(win_path.join("winapi.c"))
             .file(win_path.join("winsock.c"));
     } else {
+        // CMakeLists.txt also checks that it's not OS/390
         if !android {
             println!("cargo:rustc-link-lib=pthread");
         }
@@ -281,7 +282,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
         build.file(unix_path.join("openbsd.c"));
     }
 
-    // CMakeLists.txt has a check for OS/390 here again
+    // CMakeLists.txt has a check for OS/390 and OS/400 here
 
     if solaris {
         build
