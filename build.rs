@@ -1,6 +1,8 @@
 use std::env;
 use std::error;
 use std::fmt;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -35,7 +37,10 @@ type Result<T> = std::result::Result<T, Error>;
 fn build_pkgconfig_max_version() -> String {
     let dotidx = LIBUV_VERSION.find('.').unwrap();
     let dotidx2 = LIBUV_VERSION[(dotidx + 1)..].find('.').unwrap() + dotidx + 1;
-    let next_minor_version = LIBUV_VERSION[(dotidx + 1)..dotidx2].parse::<usize>().unwrap() + 1;
+    let next_minor_version = LIBUV_VERSION[(dotidx + 1)..dotidx2]
+        .parse::<usize>()
+        .unwrap()
+        + 1;
     format!("{}.{}.0", &LIBUV_VERSION[..dotidx], next_minor_version)
 }
 
@@ -65,7 +70,7 @@ fn try_pkgconfig() -> Option<Option<PathBuf>> {
         // error...
         return Some(None);
     }
-    return None
+    return None;
 }
 
 #[cfg(windows)]
@@ -78,12 +83,12 @@ fn windows_version_specific_settings(build: &mut cc::Build) {
             println!("cargo:rustc-link-lib=shell32");
             println!("cargo:rustc-link-lib=user32");
             build.define("_WIN32_WINNT", "0x0600")
-        },
-        (6, 1, _) => build.define("_WIN32_WINNT", "0x0601"),    // Windows 7
-        (6, 2, _) => build.define("_WIN32_WINNT", "0x0602"),    // Windows 8
-        (6, 3, _) => build.define("_WIN32_WINNT", "0x0603"),    // Windows 8.1
-        (10, _, _) => build.define("_WIN32_WINNT", "0x0A00"),   // Windows 10
-        _ => panic!("This version of Windows is unsupported by libuv.")
+        }
+        (6, 1, _) => build.define("_WIN32_WINNT", "0x0601"), // Windows 7
+        (6, 2, _) => build.define("_WIN32_WINNT", "0x0602"), // Windows 8
+        (6, 3, _) => build.define("_WIN32_WINNT", "0x0603"), // Windows 8.1
+        (10, _, _) => build.define("_WIN32_WINNT", "0x0A00"), // Windows 10
+        _ => panic!("This version of Windows is unsupported by libuv."),
     };
 }
 
@@ -320,14 +325,27 @@ fn generate_bindings<P: AsRef<Path>>(include_path: &P) -> Result<()> {
         .whitelist_var("NI_.+")
         .whitelist_var("SIG.+")
         .whitelist_var("SOCK_.+")
+        .whitelist_type("__socket_type.*")
         .generate()
         .map_err(|_| Error::BindgenError)?;
 
+    // generate output
+    let output = bindings.to_string();
+
+    // On some linux systems, the SOCK_* constants end up getting prefixed with __socket_type_ -
+    // we'll strip that prefix here
+    let output = output.replace("__socket_type_", "");
+
     // write to file
-    let outdir = PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings.rs");
-    bindings
-        .write_to_file(&outdir)
-        .map_err(|e| Error::PathError(outdir.to_string_lossy().into(), e))?;
+    let filename = PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings.rs");
+    let mut file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(filename.clone())
+        .map_err(|e| Error::PathError(filename.to_string_lossy().into(), e))?;
+    file.write(output.as_bytes())
+        .map_err(|e| Error::PathError(filename.to_string_lossy().into(), e))?;
 
     Ok(())
 }
