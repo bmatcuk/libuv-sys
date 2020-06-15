@@ -2,8 +2,8 @@ use std::env;
 use std::error;
 use std::fmt;
 use std::fs::OpenOptions;
-use std::io::Write;
 use std::io;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 static LIBUV_VERSION: &str = "1.37.0";
@@ -325,16 +325,20 @@ fn generate_bindings<P: AsRef<Path>>(include_path: &P) -> Result<()> {
         .whitelist_var("NI_.+")
         .whitelist_var("SIG.+")
         .whitelist_var("SOCK_.+")
-        .whitelist_type("__socket_type.*")
+        .whitelist_type("__socket_type.*") // some linux distros
+        .whitelist_type("IPPROTO") // Windows
         .generate()
         .map_err(|_| Error::BindgenError)?;
 
     // generate output
     let output = bindings.to_string();
 
-    // On some linux systems, the SOCK_* constants end up getting prefixed with __socket_type_ -
-    // we'll strip that prefix here
-    let output = output.replace("__socket_type_", "");
+    // On some linux systems, the SOCK_* constants end up getting prefixed with __socket_type_.
+    // Additionally, on Windows, the IPPROTO_* constants get prefixed with IPPROTO_ (so,
+    // IPPROTO_IPPROTO_TCP, for example). We'll strip those prefixes here.
+    let output = output
+        .replace("__socket_type_", "")
+        .replace("IPPROTO_IPPROTO_", "IPPROTO_");
 
     // write to file
     let filename = PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings.rs");
