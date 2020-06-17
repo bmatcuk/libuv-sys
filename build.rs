@@ -6,7 +6,7 @@ use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-static LIBUV_VERSION: &str = "1.37.0";
+static LIBUV_VERSION: &str = "1.38.0";
 
 #[derive(Debug)]
 enum Error {
@@ -73,28 +73,6 @@ fn try_pkgconfig() -> Option<Option<PathBuf>> {
     return None;
 }
 
-#[cfg(windows)]
-fn windows_version_specific_settings(build: &mut cc::Build) {
-    match nt_version::get() {
-        (6, 0, _) => {
-            // Vista
-            println!("cargo:rustc-link-lib=advapi32");
-            println!("cargo:rustc-link-lib=psapi");
-            println!("cargo:rustc-link-lib=shell32");
-            println!("cargo:rustc-link-lib=user32");
-            build.define("_WIN32_WINNT", "0x0600")
-        }
-        (6, 1, _) => build.define("_WIN32_WINNT", "0x0601"), // Windows 7
-        (6, 2, _) => build.define("_WIN32_WINNT", "0x0602"), // Windows 8
-        (6, 3, _) => build.define("_WIN32_WINNT", "0x0603"), // Windows 8.1
-        (10, _, _) => build.define("_WIN32_WINNT", "0x0A00"), // Windows 10
-        _ => panic!("This version of Windows is unsupported by libuv."),
-    };
-}
-
-#[cfg(not(windows))]
-fn windows_version_specific_settings(_build: &mut cc::Build) {}
-
 fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
     let src_path = source_path.as_ref().join("src");
     let unix_path = src_path.join("unix");
@@ -120,7 +98,19 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
         .include(&src_path);
 
     if msvc {
-        build.flag("/W4");
+        build
+            .flag("/W4")
+            .flag("/wd4100") // no-unused-parameter
+            .flag("/wd4127") // no-conditional-constant
+            .flag("/wd4201") // no-nonstandard
+            .flag("/wd4206") // no-nonstandard-empty-tu
+            .flag("/wd4210") // no-nonstandard-file-scope
+            .flag("/wd4232") // no-nonstandard-nonstatic-dlimport
+            .flag("/wd4456") // no-hides-local
+            .flag("/wd4457") // no-hides-param
+            .flag("/wd4459") // no-hides-global
+            .flag("/wd4706") // no-conditional-assignment
+            .flag("/wd4996"); // no-unsafe
     } else if apple || clang || gnu {
         build
             .flag("-fvisibility=hidden")
@@ -144,8 +134,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
         .file(src_path.join("version.c"));
 
     if cfg!(windows) {
-        windows_version_specific_settings(&mut build);
-
+        println!("cargo:rustc-link-lib=psapi");
         println!("cargo:rustc-link-lib=iphlpapi");
         println!("cargo:rustc-link-lib=user32");
         println!("cargo:rustc-link-lib=userenv");
@@ -153,6 +142,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
 
         let win_path = src_path.join("win");
         build
+            .define("_WIN32_WINNT", "0x0600")
             .define("WIN32_LEAN_AND_MEAN", None)
             .file(win_path.join("async.c"))
             .file(win_path.join("core.c"))
