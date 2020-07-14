@@ -6,7 +6,7 @@ use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-static LIBUV_VERSION: &str = "1.38.0";
+static LIBUV_VERSION: &str = "1.38.1";
 
 #[derive(Debug)]
 enum Error {
@@ -203,6 +203,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
     if android {
         println!("cargo:rustc-link-lib=dl");
         build
+            .define("_GNU_SOURCE", None)
             .file(unix_path.join("android-ifaddrs.c"))
             .file(unix_path.join("linux-core.c"))
             .file(unix_path.join("linux-inotify.c"))
@@ -211,8 +212,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
             .file(unix_path.join("pthread-fixes.c"))
             .file(unix_path.join("random-getentropy.c"))
             .file(unix_path.join("random-getrandom.c"))
-            .file(unix_path.join("random-sysctl-linux.c"))
-            .file(unix_path.join("sysinfo-loadavg.c"));
+            .file(unix_path.join("random-sysctl-linux.c"));
     }
 
     // in CMakeLists.txt, this also tests for OS/390
@@ -228,7 +228,6 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
         build
             .file(unix_path.join("posix-hrtime.c"))
             .file(unix_path.join("bsd-proctitle.c"));
-        println!("cargo:rustc-link-lib=kvm");
     }
 
     if apple || dragonfly || freebsd || netbsd || openbsd {
@@ -263,14 +262,14 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
             .file(unix_path.join("linux-syscalls.c"))
             .file(unix_path.join("procfs-exepath.c"))
             .file(unix_path.join("random-getrandom.c"))
-            .file(unix_path.join("random-sysctl-linux.c"))
-            .file(unix_path.join("sysinfo-loadavg.c"));
+            .file(unix_path.join("random-sysctl-linux.c"));
         println!("cargo:rustc-link-lib=dl");
         println!("cargo:rustc-link-lib=rt");
     }
 
     if netbsd {
         build.file(unix_path.join("netbsd.c"));
+        println!("cargo:rustc-link-lib=kvm");
     }
 
     if openbsd {
