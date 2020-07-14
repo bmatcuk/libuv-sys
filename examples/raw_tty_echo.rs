@@ -142,14 +142,14 @@ unsafe fn stop(globals: *mut Globals) -> Result<()> {
 /// This function is used by uv_read_start to allocate memory for the read.
 unsafe extern "C" fn alloc_cb(
     _handle: *mut uv_handle_t,
-    suggested_size: usize,
+    suggested_size: u64,
     buf: *mut uv_buf_t,
 ) {
     // Our allocation is pretty "dumb" here: we're just going to allocate a vec of the suggested
     // size. In a production app, we'd probably do something fancier to avoid allocating all the
     // time. Once the vec is allocated, we stick a raw pointer in the uv_buf_t and then call
     // mem::forget() on it so that it will not be deallocated when this method returns.
-    let mut data = Vec::with_capacity(suggested_size);
+    let mut data = Vec::with_capacity(suggested_size as _);
     (*buf).base = data.as_mut_ptr() as *mut c_char;
     (*buf).len = suggested_size as _;
     mem::forget(data);
@@ -182,8 +182,13 @@ unsafe fn write(globals: *mut Globals, mut data: Vec<u8>, len: usize) -> Result<
     ))
 }
 
+#[cfg(not(windows))]
+type NREAD = i64;
+#[cfg(windows)]
+type NREAD = isize;
+
 /// When a read happens on the tty "stream", this callback is called.
-unsafe extern "C" fn read_cb(stream: *mut uv_stream_t, nread: isize, buf: *const uv_buf_t) {
+unsafe extern "C" fn read_cb(stream: *mut uv_stream_t, nread: NREAD, buf: *const uv_buf_t) {
     let globals = Globals::get_from_handle(uv_handle!(stream));
     let mut end = false;
     if nread > 0 {
@@ -277,7 +282,7 @@ unsafe fn run() -> std::result::Result<(), Box<dyn Error>> {
     uvret!(uv_read_start(
         uv_handle!(&mut (*globals).tty),
         Some(alloc_cb),
-        Some(read_cb),
+        Some(read_cb as _),
     ))?;
 
     // output a little welcome message at program start
