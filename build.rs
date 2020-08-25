@@ -6,7 +6,7 @@ use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-static LIBUV_VERSION: &str = "1.38.1";
+static LIBUV_VERSION: &str = "1.39.0";
 
 #[derive(Debug)]
 enum Error {
@@ -110,7 +110,8 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
             .flag("/wd4457") // no-hides-param
             .flag("/wd4459") // no-hides-global
             .flag("/wd4706") // no-conditional-assignment
-            .flag("/wd4996"); // no-unsafe
+            .flag("/wd4996") // no-unsafe
+            .flag("/utf-8"); // utf8
     } else if apple || clang || gnu {
         build
             .flag("-fvisibility=hidden")
@@ -135,8 +136,9 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
 
     if cfg!(windows) {
         println!("cargo:rustc-link-lib=psapi");
-        println!("cargo:rustc-link-lib=iphlpapi");
         println!("cargo:rustc-link-lib=user32");
+        println!("cargo:rustc-link-lib=advapi32");
+        println!("cargo:rustc-link-lib=iphlpapi");
         println!("cargo:rustc-link-lib=userenv");
         println!("cargo:rustc-link-lib=ws2_32");
 
