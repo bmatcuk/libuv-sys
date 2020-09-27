@@ -6,7 +6,7 @@ use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-static LIBUV_VERSION: &str = "1.39.0";
+static LIBUV_VERSION: &str = "1.40.0";
 
 #[derive(Debug)]
 enum Error {
@@ -172,7 +172,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
             .file(win_path.join("winapi.c"))
             .file(win_path.join("winsock.c"));
     } else {
-        // CMakeLists.txt also checks that it's not OS/390
+        // CMakeLists.txt also checks that it's not OS/390 and not QNX
         if !android {
             println!("cargo:rustc-link-lib=pthread");
         }
@@ -291,6 +291,8 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
         println!("cargo:rustc-link-lib=sendfile");
         println!("cargo:rustc-link-lib=socket");
     }
+
+    // CMakeLists.txt has a check for Haiku and QNX here
 
     build.compile("uv");
     Ok(())
