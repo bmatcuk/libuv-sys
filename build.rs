@@ -73,7 +73,8 @@ fn try_pkgconfig() -> Option<Option<PathBuf>> {
     return None;
 }
 
-fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
+#[cfg(not(feature = "vendored-cmake"))]
+fn build<P: AsRef<Path>>(source_path: &P) -> Result<PathBuf> {
     let src_path = source_path.as_ref().join("src");
     let unix_path = src_path.join("unix");
 
@@ -295,7 +296,30 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
     // CMakeLists.txt has a check for Haiku and QNX here
 
     build.compile("uv");
-    Ok(())
+
+    let install_dir = env::var_os("OUT_DIR")
+        .map(PathBuf::from)
+        .expect("Missing environment variable `OUT_DIR`");
+    Ok(install_dir)
+}
+
+#[cfg(feature = "vendored-cmake")]
+/// Build libuv using CMake and emit the appropriate linker arguments
+fn build(source_path: impl AsRef<Path>) -> Result<PathBuf> {
+    let install_dir = cmake::Config::new(source_path).build();
+
+    let lib_dir = install_dir.join("lib");
+    // copy libuv so we do not have to change the linker args later
+    std::fs::copy(lib_dir.join("libuv_a.a"), lib_dir.join("libuv.a"))
+        .expect("Failed to copy libuv_a.a");
+
+    println!("cargo:root={}", install_dir.display());
+    println!("cargo:include={}", install_dir.join("include").display());
+
+    println!("cargo:rustc-link-search=native={}", install_dir.join("lib").display());
+    println!("cargo:rustc-link-lib=static=uv");
+
+    Ok(install_dir)
 }
 
 fn generate_bindings<P: AsRef<Path>>(include_path: &P) -> Result<()> {
@@ -347,22 +371,31 @@ fn generate_bindings<P: AsRef<Path>>(include_path: &P) -> Result<()> {
     Ok(())
 }
 
+
 fn main() {
     let source_path = PathBuf::from("libuv");
-    let mut include_path = source_path.join("include");
 
-    // try pkg-config first
-    if let Some(maybe_include) = try_pkgconfig() {
-        // pkg-config successfully found a version of libuv, but may not be able to find headers...
-        // that's ok, though, we have our own.
-        if let Some(incl) = maybe_include {
-            include_path = incl;
-        }
+    let include_path = if cfg!(feature = "vendored-cmake") {
+        let install_dir = build(&source_path)
+            .expect("Failed to build vendored libuv.");
+        install_dir.join("include")
     } else {
-        build(&source_path).unwrap();
-    }
+        let mut include_path = source_path.join("include");
+
+        // try pkg-config first
+        if let Some(maybe_include) = try_pkgconfig() {
+            // pkg-config successfully found a version of libuv, but may not be able to find headers...
+            // that's ok, though, we have our own.
+            if let Some(incl) = maybe_include {
+                include_path = incl;
+            }
+        } else {
+            build(&source_path).unwrap();
+        }
+        println!("cargo:include={}", include_path.display());
+        include_path
+    };
 
     // generate bindings
     generate_bindings(&include_path).unwrap();
-    println!("cargo:include={}", include_path.to_string_lossy());
 }

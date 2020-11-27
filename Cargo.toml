@@ -16,7 +16,12 @@ links = "uv"
 travis-ci = { repository = "bmatcuk/libuv-sys" }
 maintenance = { status = "actively-developed" }
 
+[features]
+
+vendored-cmake = [ "cmake" ]
+
 [build-dependencies]
 bindgen = "0.54"
 cc = "1.0"
 pkg-config = "0.3.17"
+cmake = { optional = true, version = "0.1.45" }
