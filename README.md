@@ -40,6 +40,13 @@ documentation to make sure you have all the required software installed. For
 example, on Windows, you'll need to use the msvc toolchain to compile
 libuv-sys2.
 
+libuv-sys2 will attempt to use [pkg-config] to find a matching local install of
+[libuv]. If that fails, it will build [libuv] from source. Starting with
+version 1.40.1, you can enable the `skip-pkg-config` feature to always build
+from source. In prior versions, you could skip pkg-config by setting an
+environment variable called `LIBUV_NO_PKG_CONFIG`. See the [pkg-config]
+documentation for more information.
+
 ## Usage
 Import the library in your project:
 
@@ -99,5 +106,6 @@ need to use rust's msvc toolchain to compile libuv-sys2!
 [examples]: https://github.com/bmatcuk/libuv-sys/tree/master/examples
 [libuv's documentation]: http://docs.libuv.org
 [libuv]: https://libuv.org/
+[pkg-config]: https://github.com/rust-lang/pkg-config-rs
 [releases]: https://github.com/bmatcuk/libuv-sys/releases
 [semantic versioning]: https://semver.org/

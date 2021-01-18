@@ -46,7 +46,7 @@ fn build_pkgconfig_max_version() -> String {
 
 fn try_pkgconfig() -> Option<Option<PathBuf>> {
     // can't use pkg-config for cross-compile
-    if env::var("TARGET") != env::var("HOST") {
+    if env::var("TARGET") != env::var("HOST") || cfg!(feature = "skip-pkg-config") {
         return None;
     }
 

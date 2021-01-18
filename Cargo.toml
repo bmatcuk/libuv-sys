@@ -1,6 +1,6 @@
 [package]
 name = "libuv-sys2"
-version = "1.40.0"
+version = "1.40.1"
 description = "Thin FFI bindings for libuv"
 homepage = "https://github.com/bmatcuk/libuv-sys/"
 repository = "https://github.com/bmatcuk/libuv-sys/"
@@ -11,6 +11,9 @@ license-file = "LICENSE"
 authors = ["Bob Matcuk <bmatcuk@gmail.com>"]
 edition = "2018"
 links = "uv"
+
+[features]
+skip-pkg-config = []
 
 [badges]
 travis-ci = { repository = "bmatcuk/libuv-sys" }
