@@ -6,7 +6,7 @@ use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-static LIBUV_VERSION: &str = "1.40.0";
+static LIBUV_VERSION: &str = "1.41.0";
 
 #[derive(Debug)]
 enum Error {
@@ -121,6 +121,9 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
             .flag("-Wstrict-prototypes")
             .flag("-Wno-unused-parameter");
     }
+    if gnu {
+        build.flag("-fno-strict-aliasing");
+    }
 
     build
         .file(src_path.join("fs-poll.c"))
@@ -144,7 +147,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
 
         let win_path = src_path.join("win");
         build
-            .define("_WIN32_WINNT", "0x0600")
+            .define("_WIN32_WINNT", "0x0602")
             .define("WIN32_LEAN_AND_MEAN", None)
             .file(win_path.join("async.c"))
             .file(win_path.join("core.c"))
