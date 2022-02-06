@@ -1,0 +1,24 @@
+name: Prepare New libuv Version
+
+on:
+  repository_dispatch:
+    types: [prepare-new-libuv-version]
+
+jobs:
+  prepare:
+    name: Preparing New libuv Version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+          token: ${{ secrets.CustomGithubToken }}
+      - name: Run Script
+        shell: bash
+        run: scripts/prepare.sh
+        env:
+          LIBUV_TAG_URL: ${{ github.event.client_payload.LIBUV_TAG_URL }}
+          GIT_USER_NAME: ${{ secrets.GitUserName }}
+          GIT_USER_EMAIL: ${{ secrets.GitUserEmail }}
+          GITHUB_TOKEN: ${{ secrets.CustomGithubToken }}
