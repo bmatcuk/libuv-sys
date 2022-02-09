@@ -34,7 +34,7 @@ git push --tags
 
 # build RELEASELOG.md and release
 { echo -e "Corresponds to libuv ${LIBUV_VERSION}.\n\n## Changelog\n\n"; git log --pretty=format:"%h %s" "${PREV_TAG}.." 2>/dev/null; } > RELEASELOG.md || true
-gh release create "$OUR_TAG" --notes-file RELEASELOG.md README.md
+gh release create "$OUR_TAG" README.md --notes-file RELEASELOG.md --title "$OUR_TAG"
 
 MSG="libuv-sys $OUR_TAG published"
 print_status notice "$MSG"
