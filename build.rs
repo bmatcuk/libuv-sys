@@ -6,7 +6,7 @@ use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-static LIBUV_VERSION: &str = "1.41.1";
+static LIBUV_VERSION: &str = "1.42.0";
 
 #[derive(Debug)]
 enum Error {
@@ -217,10 +217,10 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
             .file(unix_path.join("pthread-fixes.c"))
             .file(unix_path.join("random-getentropy.c"))
             .file(unix_path.join("random-getrandom.c"))
-            .file(unix_path.join("random-sysctl-linux.c"));
+            .file(unix_path.join("random-sysctl-linux.c"))
+            .file(unix_path.join("epoll.c"));
     }
 
-    // in CMakeLists.txt, this also tests for OS/390
     if apple || android || linux {
         build.file(unix_path.join("proctitle.c"));
     }
@@ -267,7 +267,8 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
             .file(unix_path.join("linux-syscalls.c"))
             .file(unix_path.join("procfs-exepath.c"))
             .file(unix_path.join("random-getrandom.c"))
-            .file(unix_path.join("random-sysctl-linux.c"));
+            .file(unix_path.join("random-sysctl-linux.c"))
+            .file(unix_path.join("epoll.c"));
         println!("cargo:rustc-link-lib=dl");
         println!("cargo:rustc-link-lib=rt");
     }
@@ -287,6 +288,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
         build
             .define("__EXTENSIONS__", None)
             .define("_XOPEN_SOURCE", "500")
+            .define("_REENTRANT", None)
             .file(unix_path.join("no-proctitle.c"))
             .file(unix_path.join("sunos.c"));
         println!("cargo:rustc-link-lib=kstat");
