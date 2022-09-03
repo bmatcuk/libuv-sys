@@ -6,7 +6,7 @@ use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-static LIBUV_VERSION: &str = "1.44.1";
+static LIBUV_VERSION: &str = "1.44.2";
 
 #[derive(Debug)]
 enum Error {
@@ -131,6 +131,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
         .file(src_path.join("inet.c"))
         .file(src_path.join("random.c"))
         .file(src_path.join("strscpy.c"))
+        .file(src_path.join("strtok.c"))
         .file(src_path.join("threadpool.c"))
         .file(src_path.join("timer.c"))
         .file(src_path.join("uv-common.c"))
@@ -257,7 +258,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
             .file(unix_path.join("fsevents.c"));
     }
 
-    // CMakeLists.txt has a check for GNU here
+    // CMakeLists.txt has a check for GNU and kFreeBSD here
 
     if linux {
         build
