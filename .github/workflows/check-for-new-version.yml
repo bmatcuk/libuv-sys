@@ -1,0 +1,24 @@
+name: Check For New Version
+
+on:
+  schedule:
+    - cron: '42 10 * * *'
+  workflow_dispatch:
+
+jobs:
+  get-version:
+    name: Check For New Version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Script
+        id: check
+        shell: bash
+        run: scripts/check-version.sh
+        outputs:
+          version:
+            description: 'New libuv version'
+      - name: Prepare New Version
+        uses: bmatcuk/libuv-sys/.github/workflows/prepare-new-libuv-version.yml@master
+        with:
+          version: ${{ steps.check.outputs.version }}
+        secrets: inherit
