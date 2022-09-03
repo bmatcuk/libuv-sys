@@ -16,7 +16,7 @@ print_status notice "latest libuv-sys: $LASTVER"
 VER="$(curl https://api.github.com/repos/libuv/libuv/tags | jq -r --arg current "$LASTVER" 'def ver($v): $v | ltrimstr("v") | split(".") | map(tonumber); map(ver(.name)) | map(select(. > ver($current))) | sort | first | if . == null then "" else join(".") end')"
 if [ -z "$VER" ]; then
   print_status notice "no new libuv version"
-  exit 1
+  exit 0
 fi
 print_status notice "next libuv: $VER"
 echo "::set-output name=version::v$VER"

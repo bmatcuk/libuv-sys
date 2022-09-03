@@ -22,6 +22,7 @@ jobs:
   prepare:
     name: Prepare New Version
     needs: getversion
+    if: needs.getversion.outputs.version != ''
     uses: bmatcuk/libuv-sys/.github/workflows/prepare-new-libuv-version.yml@master
     with:
       version: ${{ needs.getversion.outputs.version }}
