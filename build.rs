@@ -6,7 +6,7 @@ use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-static LIBUV_VERSION: &str = "1.43.0";
+static LIBUV_VERSION: &str = "1.44.0";
 
 #[derive(Debug)]
 enum Error {
@@ -209,7 +209,6 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
         println!("cargo:rustc-link-lib=dl");
         build
             .define("_GNU_SOURCE", None)
-            .file(unix_path.join("android-ifaddrs.c"))
             .file(unix_path.join("linux-core.c"))
             .file(unix_path.join("linux-inotify.c"))
             .file(unix_path.join("linux-syscalls.c"))
@@ -257,6 +256,8 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
             .file(unix_path.join("darwin.c"))
             .file(unix_path.join("fsevents.c"));
     }
+
+    // CMakeLists.txt has a check for GNU here
 
     if linux {
         build
