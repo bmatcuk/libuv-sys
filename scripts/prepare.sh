@@ -21,8 +21,8 @@ git fetch --tags
 popd
 
 # parse tag url
-if [[ ! "$LIBUV_TAG_URL" =~ https://github.com/libuv/libuv/releases/tag/(v[0-9]+.[0-9]+.[0-9]+) ]]; then
-  MSG="Unexpected tag url: $LIBUV_TAG_URL"
+if [[ ! "$LIBUV_TAG" =~ (v[0-9]+.[0-9]+.[0-9]+) ]]; then
+  MSG="Unexpected tag: $LIBUV_TAG"
   print_status warning "$MSG"
   exit 1
 fi

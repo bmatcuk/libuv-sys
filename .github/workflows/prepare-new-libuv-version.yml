@@ -21,7 +21,7 @@ jobs:
         shell: bash
         run: scripts/prepare.sh
         env:
-          LIBUV_TAG_URL: ${{ inputs.version }}
+          LIBUV_TAG: ${{ inputs.version }}
           GIT_USER_NAME: ${{ secrets.GitUserName }}
           GIT_USER_EMAIL: ${{ secrets.GitUserEmail }}
           GITHUB_TOKEN: ${{ secrets.CustomGithubToken }}
