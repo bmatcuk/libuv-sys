@@ -19,11 +19,28 @@ jobs:
         shell: bash
         run: scripts/check-version.sh
 
-  prepare:
-    name: Prepare New Version
+  # prepare:
+  #   name: Prepare New Version
+  #   needs: getversion
+  #   if: needs.getversion.outputs.version != ''
+  #   uses: bmatcuk/libuv-sys/.github/workflows/prepare-new-libuv-version.yml@master
+  #   with:
+  #     version: ${{ needs.getversion.outputs.version }}
+  #   secrets: inherit
+
+  notify:
+    name: Notify New Version
     needs: getversion
     if: needs.getversion.outputs.version != ''
-    uses: bmatcuk/libuv-sys/.github/workflows/prepare-new-libuv-version.yml@master
-    with:
-      version: ${{ needs.getversion.outputs.version }}
-    secrets: inherit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EmailUsername }}
+          password: ${{ secrets.EmailPassword }}
+          to: ${{ secrets.ToEmail }}
+          subject: New libuv Version
+          body: Version ${{ needs.getversion.outputs.version }} of libuv is now available.
