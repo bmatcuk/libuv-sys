@@ -10,7 +10,7 @@ print_status() {
   echo "::$level::$body"
 }
 
-LASTVER="$(curl https://api.github.com/repos/bmatcuk/libuv-sys/tags | jq -r 'def ver($v): $v | ltrimstr("v") | split(".") | map(tonumber); map(ver(.name)) | sort | last | join(".")')"
+LASTVER="$(curl https://api.github.com/repos/bmatcuk/libuv-sys/git/matching-refs/tags/libuv-v | jq -r 'def ver($v): $v | ltrimstr("refs/tags/libuv-v") | split(".") | map(tonumber); map(ver(.ref)) | sort | last | join(".")')"
 print_status notice "latest libuv-sys: $LASTVER"
 
 VER="$(curl https://api.github.com/repos/libuv/libuv/tags | jq -r --arg current "$LASTVER" 'def ver($v): $v | ltrimstr("v") | split(".") | map(tonumber); map(ver(.name)) | map(select(. > ver($current))) | sort | first | if . == null then "" else join(".") end')"
