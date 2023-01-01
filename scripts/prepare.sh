@@ -55,7 +55,7 @@ echo "libuv-sys branch: $LIBUV_SYS_BRANCH"
 # calculate version number for libuv-sys
 LIBUV_SYS_NEXT_VER="$(git tag | grep "${LIBUV_MAJ_MIN}." | sort -V | tail -n1)"
 if [[ "$LIBUV_SYS_NEXT_VER" =~ .([0-9]+)$ ]]; then
-  LIBUV_SYS_NEXT_VER="${LIBUV_MAJ_MIN}.$(( "${BASH_REMATCH[1]}" + 1 ))"
+  LIBUV_SYS_NEXT_VER="${LIBUV_MAJ_MIN}.$(( ${BASH_REMATCH[1]} + 1 ))"
 else
   LIBUV_SYS_NEXT_VER="${LIBUV_MAJ_MIN}.0"
 fi

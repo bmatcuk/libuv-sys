@@ -10,10 +10,10 @@ print_status() {
   echo "::$level::$body"
 }
 
-LASTVER="$(curl https://api.github.com/repos/bmatcuk/libuv-sys/git/matching-refs/tags/libuv-v | jq -r 'def ver($v): $v | ltrimstr("refs/tags/libuv-v") | split(".") | map(tonumber); map(ver(.ref)) | sort | last | join(".")')"
+LASTVER="$(git tag | grep libuv-v | sort -V | tail -n1 | sed -e 's/^libuv-v//')"
 print_status notice "latest libuv-sys: $LASTVER"
 
-VER="$(curl https://api.github.com/repos/libuv/libuv/tags | jq -r --arg current "$LASTVER" 'def ver($v): $v | ltrimstr("v") | split(".") | map(tonumber); map(ver(.name)) | map(select(. > ver($current))) | sort | first | if . == null then "" else join(".") end')"
+VER="$(curl https://api.github.com/repos/libuv/libuv/tags | jq -r --arg current "$LASTVER" 'def ver($v): $v | ltrimstr("v") | split(".") | map(tonumber); map(.name) | map(select(. | test("^v\\d+\\.\\d+\\.\\d+$";"s"))) | map(ver(.)) | map(select(. > ver($current))) | sort | first | if . == null then "" else join(".") end')"
 if [ -z "$VER" ]; then
   print_status notice "no new libuv version"
   exit 0
