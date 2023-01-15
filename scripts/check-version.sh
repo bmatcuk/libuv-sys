@@ -19,4 +19,4 @@ if [ -z "$VER" ]; then
   exit 0
 fi
 print_status notice "next libuv: $VER"
-echo "::set-output name=version::v$VER"
+echo "version=v$VER" >> $GITHUB_OUTPUT
