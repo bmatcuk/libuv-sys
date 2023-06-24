@@ -142,7 +142,7 @@ unsafe fn stop(globals: *mut Globals) -> Result<()> {
 /// This function is used by uv_read_start to allocate memory for the read.
 unsafe extern "C" fn alloc_cb(
     _handle: *mut uv_handle_t,
-    suggested_size: u64,
+    suggested_size: usize,
     buf: *mut uv_buf_t,
 ) {
     // Our allocation is pretty "dumb" here: we're just going to allocate a vec of the suggested
@@ -182,9 +182,6 @@ unsafe fn write(globals: *mut Globals, mut data: Vec<u8>, len: usize) -> Result<
     ))
 }
 
-#[cfg(not(windows))]
-type NREAD = i64;
-#[cfg(windows)]
 type NREAD = isize;
 
 /// When a read happens on the tty "stream", this callback is called.
