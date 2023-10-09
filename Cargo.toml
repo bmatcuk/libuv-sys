@@ -20,6 +20,6 @@ travis-ci = { repository = "bmatcuk/libuv-sys" }
 maintenance = { status = "actively-developed" }
 
 [build-dependencies]
-bindgen = "0.68.1"
+bindgen = { version = "0.68.1", default-features = false, features = ["runtime"] }
 cc = "1.0"
 pkg-config = "0.3.17"
