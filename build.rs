@@ -6,7 +6,7 @@ use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-static LIBUV_VERSION: &str = "1.44.2";
+static LIBUV_VERSION: &str = "1.45.0";
 
 #[derive(Debug)]
 enum Error {
@@ -132,6 +132,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
         .file(src_path.join("random.c"))
         .file(src_path.join("strscpy.c"))
         .file(src_path.join("strtok.c"))
+        .file(src_path.join("thread-common.c"))
         .file(src_path.join("threadpool.c"))
         .file(src_path.join("timer.c"))
         .file(src_path.join("uv-common.c"))
@@ -145,6 +146,9 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
         println!("cargo:rustc-link-lib=iphlpapi");
         println!("cargo:rustc-link-lib=userenv");
         println!("cargo:rustc-link-lib=ws2_32");
+        println!("cargo:rustc-link-lib=dbghelp");
+        println!("cargo:rustc-link-lib=ole32");
+        println!("cargo:rustc-link-lib=uuid");
 
         let win_path = src_path.join("win");
         build
@@ -210,15 +214,11 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
         println!("cargo:rustc-link-lib=dl");
         build
             .define("_GNU_SOURCE", None)
-            .file(unix_path.join("linux-core.c"))
-            .file(unix_path.join("linux-inotify.c"))
-            .file(unix_path.join("linux-syscalls.c"))
+            .file(unix_path.join("linux.c"))
             .file(unix_path.join("procfs-exepath.c"))
-            .file(unix_path.join("pthread-fixes.c"))
             .file(unix_path.join("random-getentropy.c"))
             .file(unix_path.join("random-getrandom.c"))
-            .file(unix_path.join("random-sysctl-linux.c"))
-            .file(unix_path.join("epoll.c"));
+            .file(unix_path.join("random-sysctl-linux.c"));
     }
 
     if apple || android || linux {
@@ -258,19 +258,16 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
             .file(unix_path.join("fsevents.c"));
     }
 
-    // CMakeLists.txt has a check for GNU and kFreeBSD here
+    // CMakeLists.txt has a check for GNU here
 
     if linux {
         build
             .define("_GNU_SOURCE", None)
             .define("_POSIX_C_SOURCE", "200112")
-            .file(unix_path.join("linux-core.c"))
-            .file(unix_path.join("linux-inotify.c"))
-            .file(unix_path.join("linux-syscalls.c"))
+            .file(unix_path.join("linux.c"))
             .file(unix_path.join("procfs-exepath.c"))
             .file(unix_path.join("random-getrandom.c"))
-            .file(unix_path.join("random-sysctl-linux.c"))
-            .file(unix_path.join("epoll.c"));
+            .file(unix_path.join("random-sysctl-linux.c"));
         println!("cargo:rustc-link-lib=dl");
         println!("cargo:rustc-link-lib=rt");
     }
@@ -287,6 +284,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
     // CMakeLists.txt has a check for OS/390 and OS/400 here
 
     if solaris {
+        // CMakeLists.txt has a check for a specific version of Solaris here (v5.10)
         build
             .define("__EXTENSIONS__", None)
             .define("_XOPEN_SOURCE", "500")
@@ -299,7 +297,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
         println!("cargo:rustc-link-lib=socket");
     }
 
-    // CMakeLists.txt has a check for Haiku and QNX here
+    // CMakeLists.txt has checks for Haiku, QNX, Cygwin, and MSYS here
 
     build.compile("uv");
     Ok(())

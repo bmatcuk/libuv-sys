@@ -15,7 +15,11 @@ some changes, I aim to have a release within 24-hours.
 libuv-sys2 uses [semantic versioning], like libuv. Major and minor versions of
 libuv-sys2 are bound to specific major/minor versions of libuv, ie, libuv-sys2
 v1.30.x corresponds to v1.30.x of libuv. The patch version of libuv-sys2 will
-change anytime libuv updates, _or_ if libuv-sys2 updates.
+change anytime libuv releases a new patch version, _or_ if libuv-sys2 updates.
+
+NOTE: bindgen was updated in v1.45.0 which changed the types of many exported
+functions, so you'll likely need to make some changes if you are upgrading from
+a prior version.
 
 ## Getting Started
 Include libuv-sys2 as a dependency in your Cargo.toml. It is recommended to use

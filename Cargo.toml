@@ -1,6 +1,6 @@
 [package]
 name = "libuv-sys2"
-version = "1.44.3"
+version = "1.45.0"
 description = "Thin FFI bindings for libuv"
 homepage = "https://github.com/bmatcuk/libuv-sys/"
 repository = "https://github.com/bmatcuk/libuv-sys/"
@@ -20,6 +20,6 @@ travis-ci = { repository = "bmatcuk/libuv-sys" }
 maintenance = { status = "actively-developed" }
 
 [build-dependencies]
-bindgen = "0.66.1"
+bindgen = "0.68.1"
 cc = "1.0"
 pkg-config = "0.3.17"
