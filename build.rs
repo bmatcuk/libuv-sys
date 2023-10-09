@@ -316,17 +316,17 @@ fn generate_bindings<P: AsRef<Path>>(include_path: &P) -> Result<()> {
     let bindings = bindgen::Builder::default()
         .header(header_path.to_string_lossy())
         .clang_arg(format!("-I{}", include_path.display()))
-        .whitelist_type("uv_.+")
-        .whitelist_function("uv_.+")
-        .whitelist_var("(?i)uv_.+")
-        .whitelist_var("AF_.+")
-        .whitelist_var("AI_.+")
-        .whitelist_var("IPPROTO_.+")
-        .whitelist_var("NI_.+")
-        .whitelist_var("SIG.+")
-        .whitelist_var("SOCK_.+")
-        .whitelist_type("__socket_type.*") // some linux distros
-        .whitelist_type("IPPROTO") // Windows
+        .allowlist_type("uv_.+")
+        .allowlist_function("uv_.+")
+        .allowlist_var("(?i)uv_.+")
+        .allowlist_var("AF_.+")
+        .allowlist_var("AI_.+")
+        .allowlist_var("IPPROTO_.+")
+        .allowlist_var("NI_.+")
+        .allowlist_var("SIG.+")
+        .allowlist_var("SOCK_.+")
+        .allowlist_type("__socket_type.*") // some linux distros
+        .allowlist_type("IPPROTO") // Windows
         .generate()
         .map_err(|_| Error::BindgenError)?;
 
