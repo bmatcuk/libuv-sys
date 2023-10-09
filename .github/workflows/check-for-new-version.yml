@@ -21,14 +21,14 @@ jobs:
         shell: bash
         run: scripts/check-version.sh
 
-  # prepare:
-  #   name: Prepare New Version
-  #   needs: getversion
-  #   if: needs.getversion.outputs.version != ''
-  #   uses: bmatcuk/libuv-sys/.github/workflows/prepare-new-libuv-version.yml@master
-  #   with:
-  #     version: ${{ needs.getversion.outputs.version }}
-  #   secrets: inherit
+  prepare:
+    name: Prepare New Version
+    needs: getversion
+    if: needs.getversion.outputs.version != ''
+    uses: bmatcuk/libuv-sys/.github/workflows/prepare-new-libuv-version.yml@master
+    with:
+      version: ${{ needs.getversion.outputs.version }}
+    secrets: inherit
 
   notify:
     name: Notify New Version
@@ -44,5 +44,6 @@ jobs:
           username: ${{ secrets.EmailUsername }}
           password: ${{ secrets.EmailPassword }}
           to: ${{ secrets.ToEmail }}
+          from: ${{ secrets.EmailUsername }}
           subject: New libuv Version
           body: Version ${{ needs.getversion.outputs.version }} of libuv is now available.

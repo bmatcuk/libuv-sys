@@ -6,7 +6,7 @@ use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-static LIBUV_VERSION: &str = "1.45.0";
+static LIBUV_VERSION: &str = "1.46.0";
 
 #[derive(Debug)]
 enum Error {
