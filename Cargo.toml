@@ -19,7 +19,12 @@ skip-pkg-config = []
 travis-ci = { repository = "bmatcuk/libuv-sys" }
 maintenance = { status = "actively-developed" }
 
+[features]
+
+vendored-cmake = [ "cmake" ]
+
 [build-dependencies]
 bindgen = { version = "0.68.1", default-features = false, features = ["runtime"] }
 cc = "1.0"
 pkg-config = "0.3.17"
+cmake = { optional = true, version = "0.1.45" }
