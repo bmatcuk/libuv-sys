@@ -1,6 +1,6 @@
 [package]
 name = "libuv-sys2"
-version = "1.49.1"
+version = "1.49.2"
 description = "Thin FFI bindings for libuv"
 homepage = "https://github.com/bmatcuk/libuv-sys/"
 repository = "https://github.com/bmatcuk/libuv-sys/"
