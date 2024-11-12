@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/bmatcuk/libuv-sys.svg?branch=master)](https://travis-ci.com/bmatcuk/libuv-sys)
+[![Build Status](https://github.com/bmatcuk/libuv-sys/actions/workflows/test-and-release.yml/badge.svg)](https://github.com/bmatcuk/libuv-sys/actions)
 [![Latest Release](https://img.shields.io/crates/v/libuv-sys2)](https://crates.io/crates/libuv-sys2)
 
 # libuv-sys2
