@@ -6,7 +6,7 @@ use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-static LIBUV_VERSION: &str = "1.49.2";
+static LIBUV_VERSION: &str = "1.50.0";
 
 #[derive(Debug)]
 enum Error {
@@ -152,7 +152,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
 
         let win_path = src_path.join("win");
         build
-            .define("_WIN32_WINNT", "0x0602")
+            .define("_WIN32_WINNT", "0x0A00")
             .define("WIN32_LEAN_AND_MEAN", None)
             .define("_CRT_DECLARE_NONSTDC_NAMES", "0")
             .file(win_path.join("async.c"))
