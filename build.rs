@@ -6,7 +6,7 @@ use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-static LIBUV_VERSION: &str = "1.50.0";
+static LIBUV_VERSION: &str = "1.51.0";
 
 #[derive(Debug)]
 enum Error {
@@ -299,6 +299,10 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
     }
 
     // CMakeLists.txt has checks for Haiku, QNX, Cygwin, and MSYS here
+
+    if apple || dragonfly || freebsd || linux || netbsd || openbsd {
+        println!("cargo:rustc-link-lib=m");
+    }
 
     build.compile("uv");
     Ok(())
