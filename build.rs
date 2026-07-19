@@ -317,6 +317,7 @@ fn generate_bindings<P: AsRef<Path>>(include_path: &P) -> Result<()> {
 
     // generate ffi bindings
     let bindings = bindgen::Builder::default()
+        .use_core()
         .header(header_path.to_string_lossy())
         .clang_arg(format!("-I{}", include_path.display()))
         .allowlist_item("uv_.+")
