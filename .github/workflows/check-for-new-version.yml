@@ -13,7 +13,7 @@ jobs:
       version: ${{ steps.check.outputs.version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Run Script
@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Send Email
-        uses: dawidd6/action-send-mail@v3
+        uses: dawidd6/action-send-mail@v22
         with:
           server_address: smtp.gmail.com
           server_port: 465
