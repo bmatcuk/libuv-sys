@@ -6,7 +6,7 @@ use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-static LIBUV_VERSION: &str = "1.52.1";
+static LIBUV_VERSION: &str = "1.53.0";
 
 #[derive(Debug)]
 enum Error {
@@ -149,6 +149,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
         println!("cargo:rustc-link-lib=ws2_32");
         println!("cargo:rustc-link-lib=dbghelp");
         println!("cargo:rustc-link-lib=ole32");
+        println!("cargo:rustc-link-lib=synchronization");
 
         let win_path = src_path.join("win");
         build
@@ -291,6 +292,7 @@ fn build<P: AsRef<Path>>(source_path: &P) -> Result<()> {
             .define("_XOPEN_SOURCE", "500")
             .define("_REENTRANT", None)
             .file(unix_path.join("no-proctitle.c"))
+            .file(unix_path.join("random-getrandom.c"))
             .file(unix_path.join("sunos.c"));
         println!("cargo:rustc-link-lib=kstat");
         println!("cargo:rustc-link-lib=nsl");
